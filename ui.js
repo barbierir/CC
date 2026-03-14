@@ -20,9 +20,17 @@ const elements = {
   projectValue: document.getElementById("project-value"),
   foodValue: document.getElementById("food-value"),
   goldValue: document.getElementById("gold-value"),
+  populationTotalResourceValue: document.getElementById("population-total-resource-value"),
+  cityCountResourceValue: document.getElementById("city-count-resource-value"),
   foodProductionPreview: document.getElementById("food-production-preview"),
   foodUpkeepPreview: document.getElementById("food-upkeep-preview"),
   goldUpkeepPreview: document.getElementById("gold-upkeep-preview"),
+  tradePopulationPreview: document.getElementById("trade-population-preview"),
+  tradeCitiesPreview: document.getElementById("trade-cities-preview"),
+  tradeCoinagePreview: document.getElementById("trade-coinage-preview"),
+  tradeNavigationPreview: document.getElementById("trade-navigation-preview"),
+  tradeRulersPreview: document.getElementById("trade-rulers-preview"),
+  tradeTotalPreview: document.getElementById("trade-total-preview"),
   populationTotalValue: document.getElementById("population-total-value"),
   populationAssignmentsList: document.getElementById("population-assignments-list"),
   populationDistributionControls: document.getElementById("population-distribution-controls"),
@@ -65,6 +73,26 @@ function getPhaseLabel(phase) {
   }
 
   return "Pronto";
+}
+
+function formatTradeTotalRange(range) {
+  if (range.min === range.max) {
+    return String(range.min);
+  }
+
+  return `${range.min}-${range.max}`;
+}
+
+function formatRulerTrade(range, rulerCount) {
+  if (rulerCount === 0) {
+    return "0";
+  }
+
+  if (range.min === range.max) {
+    return `${range.min}`;
+  }
+
+  return `${range.min}-${range.max} (${rulerCount} Ruler${rulerCount > 1 ? "s" : ""})`;
 }
 
 function createDistributionRow(role, amount, isActiveDistribution) {
@@ -126,6 +154,13 @@ function renderDistributionControls(state) {
   }
 }
 
+function renderLeaders(state) {
+  const leaderValues = state.leaders.map(
+    (leader) => `${leader.name} — ${leader.description} [${leader.uniqueId}]`
+  );
+  renderList(elements.leadersList, leaderValues, "No leaders");
+}
+
 export function renderGame(state) {
   const economyPreview = getEconomyPreview(state);
 
@@ -141,9 +176,21 @@ export function renderGame(state) {
 
   elements.foodValue.textContent = String(state.food);
   elements.goldValue.textContent = String(state.gold);
+  elements.populationTotalResourceValue.textContent = String(state.populationTotal);
+  elements.cityCountResourceValue.textContent = String(state.cities.length);
   elements.foodProductionPreview.textContent = String(economyPreview.foodProduction);
   elements.foodUpkeepPreview.textContent = String(economyPreview.foodUpkeep);
   elements.goldUpkeepPreview.textContent = String(economyPreview.armyGoldUpkeep);
+
+  elements.tradePopulationPreview.textContent = String(economyPreview.tradePopulationGold);
+  elements.tradeCitiesPreview.textContent = String(economyPreview.citiesGold);
+  elements.tradeCoinagePreview.textContent = String(economyPreview.coinageGold);
+  elements.tradeNavigationPreview.textContent = String(economyPreview.navigationGold);
+  elements.tradeRulersPreview.textContent = formatRulerTrade(
+    economyPreview.rulerGoldRange,
+    economyPreview.rulerCount
+  );
+  elements.tradeTotalPreview.textContent = formatTradeTotalRange(economyPreview.tradeGoldRange);
 
   elements.populationTotalValue.textContent = String(state.populationTotal);
   const assignments = Object.entries(state.populationAssignments).map(
@@ -165,7 +212,7 @@ export function renderGame(state) {
     state.advances.map((advanceId) => getAdvanceNameById(advanceId)),
     "Nessun advance"
   );
-  renderList(elements.leadersList, state.leaders, "Nessun leader");
+  renderLeaders(state);
 
   // Log in ordine inverso: eventi più recenti in alto.
   renderList(elements.eventLogList, [...state.gameLog].reverse(), "Nessun evento");
@@ -173,7 +220,7 @@ export function renderGame(state) {
   if (state.currentPhase === "distribution") {
     elements.endTurnButton.textContent = "Conferma distribuzione e completa turno";
     elements.turnHelpText.textContent =
-      "Distribuisci popolazione, poi conferma per Harvest + Upkeep.";
+      "Distribuisci popolazione, poi conferma per Gain Leader + Harvest + Upkeep + Trade.";
   } else {
     elements.endTurnButton.textContent = "Avvia turno economico";
     elements.turnHelpText.textContent = "Esegue Population Increase e apre la Distribution.";
