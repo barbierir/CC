@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Historic Turns - Prototype</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="page-header">
+      <h1>Historic Turns</h1>
+      <p class="subtitle">Prototype single-player ispirato ai boardgame storici</p>
+    </header>
+
+    <main class="dashboard">
+      <section class="card" aria-labelledby="game-status-title">
+        <h2 id="game-status-title">Stato partita</h2>
+        <p><strong>Turno:</strong> <span id="turn-value">-</span></p>
+        <p><strong>Turni massimi:</strong> <span id="max-turns-value">-</span></p>
+        <p><strong>Cultura:</strong> <span id="culture-value">-</span></p>
+        <p><strong>Game Over:</strong> <span id="game-over-value">No</span></p>
+        <p><strong>Progetto corrente:</strong> <span id="project-value">Nessuno</span></p>
+      </section>
+
+      <section class="card" aria-labelledby="resources-title">
+        <h2 id="resources-title">Risorse</h2>
+        <p><strong>Cibo:</strong> <span id="food-value">0</span></p>
+        <p><strong>Oro:</strong> <span id="gold-value">0</span></p>
+      </section>
+
+      <section class="card" aria-labelledby="population-title">
+        <h2 id="population-title">Popolazione</h2>
+        <p><strong>Totale:</strong> <span id="population-total-value">0</span></p>
+        <ul id="population-assignments-list" class="compact-list"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="cities-wonders-title">
+        <h2 id="cities-wonders-title">Città e Wonders</h2>
+        <p><strong>Numero città:</strong> <span id="city-count-value">0</span></p>
+        <ul id="cities-list" class="compact-list"></ul>
+        <h3>Wonders</h3>
+        <ul id="wonders-list" class="compact-list"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="advances-leaders-title">
+        <h2 id="advances-leaders-title">Advances e Leaders</h2>
+        <h3>Advances</h3>
+        <ul id="advances-list" class="compact-list"></ul>
+        <h3>Leaders</h3>
+        <ul id="leaders-list" class="compact-list"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="controls-title">
+        <h2 id="controls-title">Controlli build/research (placeholder)</h2>
+        <p>Questa sezione ospiterà build, ricerca e redistribuzione popolazione nei prossimi step.</p>
+        <button id="end-turn-button" type="button">Concludi turno</button>
+      </section>
+
+      <section class="card full-width" aria-labelledby="event-log-title">
+        <h2 id="event-log-title">Log eventi</h2>
+        <ul id="event-log-list" class="event-log"></ul>
+      </section>
+    </main>
+
+    <script type="module" src="ui.js"></script>
+  </body>
+</html>
