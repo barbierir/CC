@@ -1,4 +1,11 @@
-const { ADVANCES, CITY_NAMES, CULTURES, DISASTERS, LEADERS, WONDERS } = window.GameData;
+const {
+  ADVANCES: GAME_ADVANCES,
+  CITY_NAMES: GAME_CITY_NAMES,
+  CULTURES: GAME_CULTURES,
+  DISASTERS: GAME_DISASTERS,
+  LEADERS: GAME_LEADERS,
+  WONDERS: GAME_WONDERS,
+} = window.GameData;
 
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
 const POPULATION_LOSS_ORDER = ["agriculture", "trade", "labor", "scholars", "army"];
@@ -31,11 +38,11 @@ function removeOneValue(values, valueToRemove) {
 }
 
 function findAdvanceById(advanceId) {
-  return ADVANCES.find((advance) => advance.id === advanceId) || null;
+  return GAME_ADVANCES.find((advance) => advance.id === advanceId) || null;
 }
 
 function findWonderDefinitionById(wonderId) {
-  return WONDERS.find((wonder) => wonder.id === wonderId) || null;
+  return GAME_WONDERS.find((wonder) => wonder.id === wonderId) || null;
 }
 
 function sumAssignments(assignments) {
@@ -111,7 +118,7 @@ function findLeaderTemplateByTypeRoll() {
   while (true) {
     const typeRoll = rollDie(6);
     if (typeRoll >= 1 && typeRoll <= 4) {
-      return LEADERS[typeRoll - 1];
+      return GAME_LEADERS[typeRoll - 1];
     }
   }
 }
@@ -360,7 +367,7 @@ function getLaborProducedThisTurn(state) {
 }
 
 function getAvailableWonderDefinitions(state) {
-  return WONDERS.filter((wonder) => {
+  return GAME_WONDERS.filter((wonder) => {
     if (!hasAdvance(state, wonder.requirementAdvanceId)) {
       return false;
     }
@@ -577,8 +584,8 @@ function resolveBuildPhase(state) {
 }
 
 function createInitialGameState() {
-  const selectedCulture = getRandomItem(CULTURES);
-  const availableCityNames = [...CITY_NAMES];
+  const selectedCulture = getRandomItem(GAME_CULTURES);
+  const availableCityNames = [...GAME_CITY_NAMES];
 
   const selectedAdvance = selectedCulture
     ? findAdvanceById(selectedCulture.startingAdvanceId)
@@ -701,7 +708,7 @@ function runHarvestPhase(state) {
 
 function getRandomDisaster() {
   const roll = rollDie(20);
-  const disaster = DISASTERS.find((item) => roll >= item.rollMin && roll <= item.rollMax);
+  const disaster = GAME_DISASTERS.find((item) => roll >= item.rollMin && roll <= item.rollMax);
   return { roll, disaster: disaster || null };
 }
 
@@ -1146,7 +1153,7 @@ function getResearchRollBreakdown(state) {
 }
 
 function getRandomAvailableAdvance(state) {
-  const availableAdvances = ADVANCES.filter((advance) => !hasAdvance(state, advance.id));
+  const availableAdvances = GAME_ADVANCES.filter((advance) => !hasAdvance(state, advance.id));
   return getRandomItem(availableAdvances) || null;
 }
 
