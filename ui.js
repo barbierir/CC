@@ -1,3 +1,4 @@
+(() => {
 const { ADVANCES: GAME_ADVANCES } = window.GameData;
 const {
   applyPopulationChange,
@@ -585,3 +586,4 @@ elements.surrenderIfWarCheckbox.addEventListener("change", () => {
 });
 
 window.renderGame = renderGame;
+})();
