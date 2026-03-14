@@ -17,6 +17,26 @@ import {
 
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
 
+const SPECIALIST_TOOLTIPS = {
+  army: "Army: combatte in guerra ma consuma 1 gold in upkeep.",
+  agriculture: "Agriculture: produce food ogni turno (più con Irrigation).",
+  trade: "Trade: genera gold base nella fase Trade.",
+  labor: "Labor: avanza i progetti di city/wonder.",
+  scholars: "Scholars: aggiungono research rolls (max 1 per city).",
+};
+
+const ADVANCE_MITIGATION_HINTS = {
+  irrigation: "Mitigates Flood and increases food from agriculture.",
+  architecture: "Mitigates Earthquake and reduces construction gold cost.",
+  music: "Mitigates Unrest.",
+  law: "Mitigates Anarchy.",
+  medicine: "Mitigates Epidemic and Pestilence.",
+  pottery: "Mitigates Famine/Drought and preserves food reserve.",
+  democracy: "Mitigates Civil War and Mad King.",
+  religion: "Mitigates Heresy impact.",
+};
+
+
 const gameState = createInitialGameState();
 
 const elements = {
@@ -53,6 +73,7 @@ const elements = {
   tradeNavigationPreview: document.getElementById("trade-navigation-preview"),
   tradeRulersPreview: document.getElementById("trade-rulers-preview"),
   tradeTotalPreview: document.getElementById("trade-total-preview"),
+  goldProductionPreview: document.getElementById("gold-production-preview"),
   researchScholarsPreview: document.getElementById("research-scholars-preview"),
   researchThinkersPreview: document.getElementById("research-thinkers-preview"),
   researchAstronomyPreview: document.getElementById("research-astronomy-preview"),
@@ -82,6 +103,10 @@ const elements = {
   startWonderProjectButton: document.getElementById("start-wonder-project-button"),
   buildStatusMessage: document.getElementById("build-status-message"),
   activeProjectBox: document.getElementById("active-project-box"),
+  buildCurrentProject: document.getElementById("build-current-project"),
+  buildLaborProgress: document.getElementById("build-labor-progress"),
+  buildLaborRequired: document.getElementById("build-labor-required"),
+  buildProjectCity: document.getElementById("build-project-city"),
   surrenderIfWarCheckbox: document.getElementById("surrender-if-war-checkbox"),
   finalScorePanel: document.getElementById("final-score-panel"),
   finalAdvancePoints: document.getElementById("final-advance-points"),
@@ -164,12 +189,14 @@ function createDistributionRow(role, amount, isActiveDistribution, state) {
   } else {
     label.textContent = role;
   }
+  label.title = SPECIALIST_TOOLTIPS[role] || "";
 
   const minusButton = document.createElement("button");
   minusButton.type = "button";
   minusButton.textContent = "-";
   const canDecrease = canDecreasePopulationRole(state, role);
   minusButton.disabled = !isActiveDistribution || !canDecrease.ok;
+  minusButton.title = canDecrease.ok ? `Decrease ${role}` : canDecrease.reason;
   minusButton.addEventListener("click", () => {
     const result = applyPopulationChange(gameState, role, -1);
     if (!result.ok) {
@@ -187,6 +214,7 @@ function createDistributionRow(role, amount, isActiveDistribution, state) {
   plusButton.textContent = "+";
   const canIncrease = canIncreasePopulationRole(state, role);
   plusButton.disabled = !isActiveDistribution || !canIncrease.ok;
+  plusButton.title = canIncrease.ok ? `Increase ${role}` : canIncrease.reason;
   plusButton.addEventListener("click", () => {
     const result = applyPopulationChange(gameState, role, 1);
     if (!result.ok) {
@@ -211,8 +239,10 @@ function renderDistributionControls(state) {
   });
 
   if (isActiveDistribution) {
+    const armyIncreaseCheck = canIncreasePopulationRole(state, "army");
+    const armyHint = armyIncreaseCheck.ok ? "" : ` Army: ${armyIncreaseCheck.reason}.`;
     elements.distributionStatus.textContent =
-      `Redistribuisci la popolazione (max ±6 per categoria). Scholars limit: ${state.populationAssignments.scholars}/${state.cities.length}.`;
+      `Redistribuisci la popolazione (max ±6 per categoria). Scholars limit: ${state.populationAssignments.scholars}/${state.cities.length}.${armyHint}`;
   } else {
     elements.distributionStatus.textContent = "Attiva solo durante la fase Distribution.";
   }
@@ -294,16 +324,15 @@ function renderBuildControls(state) {
         ? state.cities.find((city) => city.id === project.cityId)?.name || "Unknown city"
         : "-";
 
-    elements.activeProjectBox.innerHTML = `
-      <strong>Progetto attivo</strong><br />
-      Nome: ${project.name}<br />
-      Tipo: ${project.type}<br />
-      Labor: ${project.laborProgress}/${project.laborRequired}<br />
-      Gold pagato: ${project.goldCost}<br />
-      Città: ${cityLabel}
-    `;
+    elements.buildCurrentProject.textContent = `${project.name} (${project.type})`;
+    elements.buildLaborProgress.textContent = String(project.laborProgress);
+    elements.buildLaborRequired.textContent = String(project.laborRequired);
+    elements.buildProjectCity.textContent = cityLabel;
   } else {
-    elements.activeProjectBox.innerHTML = "<strong>Progetto attivo</strong><br />No active project";
+    elements.buildCurrentProject.textContent = "No active project";
+    elements.buildLaborProgress.textContent = "-";
+    elements.buildLaborRequired.textContent = "-";
+    elements.buildProjectCity.textContent = "-";
   }
 }
 
@@ -359,6 +388,7 @@ export function renderGame(state) {
     economyPreview.rulerCount
   );
   elements.tradeTotalPreview.textContent = formatTradeTotalRange(economyPreview.tradeGoldRange);
+  elements.goldProductionPreview.textContent = formatTradeTotalRange(economyPreview.tradeGoldRange);
 
   const researchBreakdown = getResearchRollBreakdown(state);
   elements.researchScholarsPreview.textContent = String(researchBreakdown.scholars);
@@ -385,15 +415,20 @@ export function renderGame(state) {
     "Nessuna città"
   );
 
-  renderList(
-    elements.wondersList,
-    state.wonders.map((wonder) => {
+  elements.wondersList.innerHTML = "";
+  if (state.wonders.length === 0) {
+    const emptyWonderItem = document.createElement("li");
+    emptyWonderItem.textContent = "No wonders yet";
+    elements.wondersList.appendChild(emptyWonderItem);
+  } else {
+    state.wonders.forEach((wonder) => {
       const cityName = state.cities.find((city) => city.id === wonder.cityId)?.name || "Unknown";
-      return `${wonder.name} in ${cityName}`;
-    }),
-    "No wonders yet"
-  );
-
+      const wonderItem = document.createElement("li");
+      wonderItem.textContent = `${wonder.name} in ${cityName}`;
+      wonderItem.title = "Wonder: unique project hosted by one city only.";
+      elements.wondersList.appendChild(wonderItem);
+    });
+  }
 
   elements.advancesList.innerHTML = "";
   if (state.advances.length === 0) {
@@ -411,6 +446,8 @@ export function renderGame(state) {
         if (state.lastUnlockedAdvance === advance.name) {
           item.classList.add("highlight-discovery");
         }
+        const mitigationHint = ADVANCE_MITIGATION_HINTS[advance.id] ? ` ${ADVANCE_MITIGATION_HINTS[advance.id]}` : "";
+        item.title = `${advance.name}: ${advance.description}${mitigationHint}`;
         item.innerHTML = `<strong>${advance.name}</strong><br /><span class="muted-line">${advance.description}</span><br /><span class="muted-line">VP: ${advance.victoryPoints}</span>`;
       }
       elements.advancesList.appendChild(item);
@@ -419,7 +456,7 @@ export function renderGame(state) {
   renderLeaders(state);
 
   elements.eventLogList.innerHTML = "";
-  const logValues = [...state.gameLog].reverse();
+  const logValues = [...state.gameLog];
   if (logValues.length === 0) {
     const li = document.createElement("li");
     li.textContent = "Nessun evento";
@@ -428,12 +465,21 @@ export function renderGame(state) {
     logValues.forEach((entry) => {
       const li = document.createElement("li");
       li.textContent = entry;
-      if (entry.startsWith("Turn ") || entry.startsWith("----------------")) {
-        li.classList.add("log-separator");
+
+      if (entry.startsWith("===== TURN")) {
+        li.classList.add("log-turn-header");
+      } else if (entry.startsWith("===== DISASTER") || entry.startsWith("===== WAR")) {
+        li.classList.add("log-block-header");
       }
+
+      if (entry.startsWith("IMPORTANT:")) {
+        li.classList.add("log-important");
+      }
+
       if (entry.startsWith("Warning:")) {
         li.classList.add("log-warning");
       }
+
       elements.eventLogList.appendChild(li);
     });
   }
