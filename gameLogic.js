@@ -3,6 +3,18 @@ import { ADVANCES, CITY_NAMES, CULTURES, DISASTERS, LEADERS, WONDERS } from "./g
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
 const POPULATION_LOSS_ORDER = ["agriculture", "trade", "labor", "scholars", "army"];
 
+function pushLog(state, message) {
+  state.gameLog.push(message);
+}
+
+function pushImportantLog(state, message) {
+  state.gameLog.push(`IMPORTANT: ${message}`);
+}
+
+function pushSectionHeader(state, title) {
+  state.gameLog.push(`===== ${title} =====`);
+}
+
 export function getRandomItem(values) {
   if (!Array.isArray(values) || values.length === 0) {
     return null;
@@ -139,7 +151,7 @@ function syncPopulationAssignments(state) {
   }
 
   if (hadNegative) {
-    state.gameLog.push("Warning: negative population assignment corrected");
+    pushLog(state, "Warning: negative population assignment corrected");
   }
 
   const total = sumAssignments(state.populationAssignments);
@@ -164,7 +176,7 @@ function syncPopulationAssignments(state) {
     overflow -= removal;
   }
 
-  state.gameLog.push("Warning: population assignments rebalanced");
+  pushLog(state, "Warning: population assignments rebalanced");
 }
 
 function enforceStateInvariants(state) {
@@ -175,7 +187,50 @@ function enforceStateInvariants(state) {
   state.gold = Math.max(0, Math.floor(state.gold || 0));
 
   if (state.food !== previousFood || state.gold !== previousGold) {
-    state.gameLog.push("Warning: negative resources corrected");
+    pushLog(state, "Warning: negative resources corrected");
+  }
+
+  const uniqueAdvances = [...new Set(state.advances)];
+  if (uniqueAdvances.length !== state.advances.length) {
+    state.advances = uniqueAdvances;
+    pushLog(state, "Warning: duplicate advances removed");
+  }
+
+  const wonderSeenById = new Set();
+  let duplicateWonderFound = false;
+  state.wonders = state.wonders.filter((wonder) => {
+    if (wonderSeenById.has(wonder.id)) {
+      duplicateWonderFound = true;
+      return false;
+    }
+
+    wonderSeenById.add(wonder.id);
+    return true;
+  });
+
+  const cityWonderHost = new Set();
+  state.wonders = state.wonders.filter((wonder) => {
+    if (cityWonderHost.has(wonder.cityId)) {
+      duplicateWonderFound = true;
+      return false;
+    }
+
+    cityWonderHost.add(wonder.cityId);
+    return true;
+  });
+
+  if (duplicateWonderFound) {
+    pushLog(state, "Warning: duplicate wonder data corrected");
+  }
+
+  state.cities.forEach((city) => {
+    const hostWonder = state.wonders.find((wonder) => wonder.cityId === city.id);
+    city.wonderId = hostWonder ? hostWonder.id : null;
+  });
+
+  if (state.currentProject && state.currentProject.laborProgress > state.currentProject.laborRequired) {
+    state.currentProject.laborProgress = state.currentProject.laborRequired;
+    pushLog(state, "Warning: project progress corrected");
   }
 
   const scholarCap = getCityCount(state);
@@ -183,7 +238,7 @@ function enforceStateInvariants(state) {
     const overflow = state.populationAssignments.scholars - scholarCap;
     state.populationAssignments.scholars = scholarCap;
     state.populationAssignments.agriculture += overflow;
-    state.gameLog.push("Warning: scholars above city limit corrected");
+    pushLog(state, "Warning: scholars above city limit corrected");
   }
 
   syncPopulationAssignments(state);
@@ -456,8 +511,8 @@ function completeCityProject(state, project) {
 
   state.cities.push(newCity);
   state.lastCompletedProject = `City completed: ${cityName}`;
-  state.gameLog.push(`New city completed: ${cityName}`);
-  state.gameLog.push(`Project completed: ${project.name}`);
+  pushImportantLog(state, `City founded: ${cityName}`);
+  pushLog(state, `Project completed: ${project.name}`);
 }
 
 function completeWonderProject(state, project) {
@@ -470,6 +525,11 @@ function completeWonderProject(state, project) {
   }
 
   city.wonderId = wonderDefinition.id;
+  if (state.wonders.some((wonder) => wonder.id === wonderDefinition.id)) {
+    pushLog(state, `Warning: duplicate wonder prevented (${wonderDefinition.name})`);
+    return;
+  }
+
   state.wonders.push({
     id: wonderDefinition.id,
     name: wonderDefinition.name,
@@ -481,8 +541,8 @@ function completeWonderProject(state, project) {
   }
   state.lastCompletedProject = `Wonder completed: ${wonderDefinition.name}`;
 
-  state.gameLog.push(`Wonder completed: ${wonderDefinition.name} in ${city.name}`);
-  state.gameLog.push(`Project completed: ${project.name}`);
+  pushImportantLog(state, `Wonder completed: ${wonderDefinition.name} in ${city.name}`);
+  pushLog(state, `Project completed: ${project.name}`);
 }
 
 export function resolveBuildPhase(state) {
@@ -496,6 +556,9 @@ export function resolveBuildPhase(state) {
 
   const project = state.currentProject;
   project.laborProgress += producedLabor;
+  if (project.laborProgress > project.laborRequired) {
+    project.laborProgress = project.laborRequired;
+  }
   state.gameLog.push(
     `Project advanced: ${project.name} (${Math.min(project.laborProgress, project.laborRequired)}/${project.laborRequired})`
   );
@@ -590,11 +653,14 @@ function startPopulationIncreasePhase(state) {
 
   const dieRoll = rollDie(6);
   const bonus = hasAdvance(state, "religion") ? 1 : 0;
-  const populationGain = Math.max(0, dieRoll - 2 + bonus);
+  let populationGain = Math.max(0, dieRoll - 2 + bonus);
+  if (state.populationTotal < 5) {
+    populationGain = Math.max(1, populationGain);
+  }
 
   state.populationTotal += populationGain;
   state.populationAssignments.agriculture += populationGain;
-  state.gameLog.push(`Population increased by ${populationGain}`);
+  pushLog(state, `Population increased by ${populationGain}`);
 }
 
 function runGainLeaderPhase(state) {
@@ -639,11 +705,16 @@ function getRandomDisaster() {
   return { roll, disaster: disaster || null };
 }
 
-function createSpecialWarFromDisaster(disasterId, mitigationApplied) {
+function createSpecialWarFromDisaster(state, disasterId, mitigationApplied) {
   const baseEnemyArmies = rollDie(6);
-  const enemyArmies = disasterId === "civil-war" && mitigationApplied
+  let enemyArmies = disasterId === "civil-war" && mitigationApplied
     ? Math.max(1, Math.floor(baseEnemyArmies / 2))
     : baseEnemyArmies;
+
+  if ((state.populationAssignments.army || 0) <= 0) {
+    enemyArmies = Math.max(1, Math.floor(enemyArmies / 2));
+    pushLog(state, "Warning: war triggered with no army, enemy armies reduced by 50%");
+  }
 
   const mapping = {
     "civil-war": {
@@ -686,16 +757,17 @@ export function resolveDisasterCheck(state) {
   state.lastWarSummary = null;
 
   const checkRoll = rollTwoDice();
-  state.gameLog.push(`Disaster check roll: ${checkRoll}`);
+  pushSectionHeader(state, "DISASTER CHECK");
+  pushLog(state, `Disaster check roll: ${checkRoll}`);
 
   if (checkRoll === 2) {
     state.pendingWar = createNormalWar(state);
-    state.gameLog.push("War triggered");
+    pushImportantLog(state, "War started");
     return;
   }
 
   if (checkRoll !== 12) {
-    state.gameLog.push("No disaster this turn");
+    pushLog(state, "No disaster this turn");
     return;
   }
 
@@ -703,7 +775,7 @@ export function resolveDisasterCheck(state) {
 
   const { roll, disaster } = getRandomDisaster();
   if (!disaster) {
-    state.gameLog.push("No disaster this turn");
+    pushLog(state, "No disaster this turn");
     return;
   }
 
@@ -713,8 +785,9 @@ export function resolveDisasterCheck(state) {
     roll,
   };
 
-  state.gameLog.push(`Disaster triggered: ${disaster.name}`);
-  state.gameLog.push(`Disaster table roll: ${roll}`);
+  pushSectionHeader(state, `DISASTER: ${disaster.name.toUpperCase()}`);
+  pushImportantLog(state, `Disaster occurred: ${disaster.name}`);
+  pushLog(state, `Disaster table roll: ${roll}`);
 
   const mitigationByAdvance = disaster.mitigationAdvanceId && hasAdvance(state, disaster.mitigationAdvanceId);
   const mitigationByWonder = disaster.mitigationWonderId && hasWonder(state, disaster.mitigationWonderId);
@@ -789,7 +862,7 @@ export function resolveDisasterCheck(state) {
       if (disaster.id === "civil-war" && mitigationByAdvance) {
         state.gameLog.push("Civil War mitigated by Democracy");
       }
-      state.pendingWar = createSpecialWarFromDisaster(disaster.id, Boolean(mitigationByAdvance));
+      state.pendingWar = createSpecialWarFromDisaster(state, disaster.id, Boolean(mitigationByAdvance));
       break;
     }
     default:
@@ -819,6 +892,11 @@ function runUpkeepPhase(state) {
   }
 
   state.gameLog.push(`Upkeep consumed ${foodConsumed} food and ${goldConsumed} gold`);
+
+  if (state.gold < 0) {
+    state.gold = 0;
+    pushLog(state, "Warning: gold corrected to 0 after upkeep");
+  }
 
   if (!hasAdvance(state, "pottery")) {
     state.food = 0;
@@ -871,7 +949,11 @@ function countBattleHits(rolls) {
 }
 
 function createNormalWar(state) {
-  const enemyArmies = sumDice(4, 6);
+  let enemyArmies = sumDice(4, 6);
+  if ((state.populationAssignments.army || 0) <= 0) {
+    enemyArmies = Math.max(1, Math.floor(enemyArmies / 2));
+    pushLog(state, "Warning: war triggered with no army, enemy armies reduced by 50%");
+  }
 
   return {
     type: "normal",
@@ -931,7 +1013,9 @@ function resolveWarPhase(state) {
     return;
   }
 
-  state.gameLog.push(`War started: ${war.name} (${war.enemyArmies} enemy armies, ${war.maxSegments} segments)`);
+  pushSectionHeader(state, `WAR: ${war.name.toUpperCase()}`);
+  pushImportantLog(state, `War started: ${war.name}`);
+  pushLog(state, `War setup: ${war.enemyArmies} enemy armies, ${war.maxSegments} segments`);
 
   for (let segment = 1; segment <= war.maxSegments; segment += 1) {
     if (war.remainingEnemyArmies <= 0 || state.populationAssignments.army <= 0) {
@@ -969,11 +1053,11 @@ function resolveWarPhase(state) {
     result = "Enemy victory";
 
     if (war.type === "barbarians") {
-      state.gameLog.push("Barbarians won: all gold lost");
+      pushImportantLog(state, "War lost: Barbarians won (all gold lost)");
     }
   } else if (war.remainingEnemyArmies <= 0 && state.populationAssignments.army > 0) {
     result = "Player victory";
-    state.gameLog.push(`War won: ${war.name}`);
+    pushImportantLog(state, `War won: ${war.name}`);
   } else {
     const goldWon = Math.max(0, war.playerLossesInflicted - war.playerLossesSuffered);
     if (goldWon > 0) {
@@ -1084,9 +1168,14 @@ export function resolveResearchPhase(state) {
       continue;
     }
 
+    if (state.advances.includes(unlockedAdvance.id)) {
+      pushLog(state, `Warning: duplicate advance prevented (${unlockedAdvance.name})`);
+      continue;
+    }
+
     state.advances.push(unlockedAdvance.id);
     state.lastUnlockedAdvance = unlockedAdvance.name;
-    state.gameLog.push(`Research breakthrough: ${unlockedAdvance.name}`);
+    pushImportantLog(state, `Advance discovered: ${unlockedAdvance.name}`);
   }
 }
 
@@ -1219,6 +1308,8 @@ export function nextTurn(state) {
   }
 
   if (state.currentPhase === "ready") {
+    enforceStateInvariants(state);
+    pushSectionHeader(state, `TURN ${state.turn}`);
     state.lastUnlockedAdvance = null;
     state.lastCompletedProject = null;
     startPopulationIncreasePhase(state);
@@ -1258,17 +1349,8 @@ export function nextTurn(state) {
 
     resolveResearchPhase(state);
 
-    const turnSummary = [
-      `Turn ${state.turn}`,
-      `Population increase resolved`,
-      `Harvest resolved`,
-      `Upkeep resolved`,
-      `Trade resolved`,
-      `Build: ${state.currentProject ? "project advanced" : "no active project"}`,
-      `Research: ${getTotalResearchRolls(state)} rolls`,
-      "------------------------------",
-    ];
-    turnSummary.forEach((line) => state.gameLog.push(line));
+    pushLog(state, `Build: ${state.currentProject ? "project advanced" : "no active project"}`);
+    pushLog(state, `Research: ${getTotalResearchRolls(state)} rolls`);
 
     state.turn += 1;
     state.currentPhase = "ready";
