@@ -1,3 +1,4 @@
+(() => {
 const {
   ADVANCES: GAME_ADVANCES,
   CITY_NAMES: GAME_CITY_NAMES,
@@ -1448,3 +1449,4 @@ window.GameLogic = {
   nextTurn,
   getEconomyPreview,
 };
+})();
