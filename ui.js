@@ -26,6 +26,9 @@ const elements = {
   phaseValue: document.getElementById("phase-value"),
   gameOverValue: document.getElementById("game-over-value"),
   projectValue: document.getElementById("project-value"),
+  lastDisasterValue: document.getElementById("last-disaster-value"),
+  lastWarValue: document.getElementById("last-war-value"),
+  buildSkippedValue: document.getElementById("build-skipped-value"),
   foodValue: document.getElementById("food-value"),
   goldValue: document.getElementById("gold-value"),
   populationTotalResourceValue: document.getElementById("population-total-resource-value"),
@@ -66,6 +69,7 @@ const elements = {
   startWonderProjectButton: document.getElementById("start-wonder-project-button"),
   buildStatusMessage: document.getElementById("build-status-message"),
   activeProjectBox: document.getElementById("active-project-box"),
+  surrenderIfWarCheckbox: document.getElementById("surrender-if-war-checkbox"),
 };
 
 function renderList(listElement, values, emptyLabel) {
@@ -297,6 +301,13 @@ export function renderGame(state) {
   elements.phaseValue.textContent = getPhaseLabel(state.currentPhase);
   elements.gameOverValue.textContent = state.gameOver ? "Sì" : "No";
   elements.projectValue.textContent = formatProjectSummary(state.currentProject);
+  elements.lastDisasterValue.textContent = state.lastDisaster
+    ? `${state.lastDisaster.name} (d20: ${state.lastDisaster.roll})`
+    : "Nessuno";
+  elements.lastWarValue.textContent = state.lastWarSummary
+    ? `${state.lastWarSummary.name} — enemy ${state.lastWarSummary.enemyArmies}, seg ${state.lastWarSummary.maxSegments}, ${state.lastWarSummary.result}`
+    : "Nessuna";
+  elements.buildSkippedValue.textContent = state.skipBuildPhase ? "Sì" : "No";
 
   elements.foodValue.textContent = String(state.food);
   elements.goldValue.textContent = String(state.gold);
@@ -374,13 +385,14 @@ export function renderGame(state) {
   if (state.currentPhase === "distribution") {
     elements.endTurnButton.textContent = "Conferma distribuzione e completa turno";
     elements.turnHelpText.textContent =
-      "Distribuisci popolazione, poi conferma per Gain Leader + Harvest + Upkeep + Leader Aging + Trade + Build + Research.";
+"Distribuisci popolazione, poi conferma per Gain Leader + Harvest + Disaster Check + Upkeep + Leader Aging + War + Trade + Build + Research.";
   } else {
     elements.endTurnButton.textContent = "Avvia turno economico";
     elements.turnHelpText.textContent = "Esegue Population Increase e apre la Distribution.";
   }
 
   elements.endTurnButton.disabled = state.gameOver;
+  elements.surrenderIfWarCheckbox.checked = Boolean(state.surrenderIfWar);
   renderBuildControls(state);
 }
 
@@ -427,3 +439,9 @@ elements.startWonderProjectButton.addEventListener("click", () => {
 });
 
 renderGame(gameState);
+
+
+elements.surrenderIfWarCheckbox.addEventListener("change", () => {
+  gameState.surrenderIfWar = elements.surrenderIfWarCheckbox.checked;
+  renderGame(gameState);
+});
