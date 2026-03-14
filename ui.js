@@ -1,4 +1,4 @@
-const { ADVANCES } = window.GameData;
+const { ADVANCES: GAME_ADVANCES } = window.GameData;
 const {
   applyPopulationChange,
   canStartCityProject,
@@ -141,7 +141,7 @@ function renderList(listElement, values, emptyLabel) {
 }
 
 function getAdvanceNameById(advanceId) {
-  const advance = ADVANCES.find((item) => item.id === advanceId);
+  const advance = GAME_ADVANCES.find((item) => item.id === advanceId);
   return advance ? advance.name : advanceId;
 }
 
@@ -446,7 +446,7 @@ function renderGame(state) {
     elements.advancesList.appendChild(emptyItem);
   } else {
     state.advances.forEach((advanceId) => {
-      const advance = ADVANCES.find((item) => item.id === advanceId);
+      const advance = GAME_ADVANCES.find((item) => item.id === advanceId);
       const item = document.createElement("li");
       item.className = "advance-item";
       if (!advance) {
