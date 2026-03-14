@@ -200,3 +200,31 @@ body {
   gap: 0.4rem;
   color: var(--text);
 }
+
+
+.highlight-complete {
+  border-color: #2b8a3e;
+  background: #eefbf1;
+  box-shadow: 0 0 0 2px rgba(43, 138, 62, 0.15);
+}
+
+.highlight-discovery {
+  border-color: #e0a100;
+  background: #fff9e8;
+}
+
+.final-score-panel {
+  border: 2px solid #29466f;
+  background: #edf3ff;
+}
+
+.log-separator {
+  font-weight: 700;
+  border-top: 1px dashed var(--border);
+  margin-top: 0.35rem;
+  padding-top: 0.35rem;
+}
+
+.log-warning {
+  color: #9a3412;
+}

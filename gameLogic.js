@@ -130,6 +130,18 @@ export function sumDice(count, sides) {
 }
 
 function syncPopulationAssignments(state) {
+  let hadNegative = false;
+  for (const role of POPULATION_ROLES) {
+    if ((state.populationAssignments[role] || 0) < 0) {
+      state.populationAssignments[role] = 0;
+      hadNegative = true;
+    }
+  }
+
+  if (hadNegative) {
+    state.gameLog.push("Warning: negative population assignment corrected");
+  }
+
   const total = sumAssignments(state.populationAssignments);
   if (total === state.populationTotal) {
     return;
@@ -151,6 +163,30 @@ function syncPopulationAssignments(state) {
     state.populationAssignments[role] -= removal;
     overflow -= removal;
   }
+
+  state.gameLog.push("Warning: population assignments rebalanced");
+}
+
+function enforceStateInvariants(state) {
+  const previousFood = state.food;
+  const previousGold = state.gold;
+
+  state.food = Math.max(0, Math.floor(state.food || 0));
+  state.gold = Math.max(0, Math.floor(state.gold || 0));
+
+  if (state.food !== previousFood || state.gold !== previousGold) {
+    state.gameLog.push("Warning: negative resources corrected");
+  }
+
+  const scholarCap = getCityCount(state);
+  if ((state.populationAssignments.scholars || 0) > scholarCap) {
+    const overflow = state.populationAssignments.scholars - scholarCap;
+    state.populationAssignments.scholars = scholarCap;
+    state.populationAssignments.agriculture += overflow;
+    state.gameLog.push("Warning: scholars above city limit corrected");
+  }
+
+  syncPopulationAssignments(state);
 }
 
 export function losePopulation(state, amount, reason) {
@@ -274,7 +310,7 @@ export function getAvailableWonderDefinitions(state) {
       return false;
     }
 
-    return !state.wonders.some((ownedWonder) => ownedWonder.id === wonder.id);
+    return !state.completedWonders.includes(wonder.id);
   });
 }
 
@@ -318,7 +354,7 @@ export function canStartWonderProject(state, wonderId, cityId) {
     };
   }
 
-  if (state.wonders.some((ownedWonder) => ownedWonder.id === wonderId)) {
+  if (state.completedWonders.includes(wonderId)) {
     return { ok: false, reason: "This wonder has already been built" };
   }
 
@@ -419,6 +455,7 @@ function completeCityProject(state, project) {
   };
 
   state.cities.push(newCity);
+  state.lastCompletedProject = `City completed: ${cityName}`;
   state.gameLog.push(`New city completed: ${cityName}`);
   state.gameLog.push(`Project completed: ${project.name}`);
 }
@@ -438,6 +475,11 @@ function completeWonderProject(state, project) {
     name: wonderDefinition.name,
     cityId: city.id,
   });
+
+  if (!state.completedWonders.includes(wonderDefinition.id)) {
+    state.completedWonders.push(wonderDefinition.id);
+  }
+  state.lastCompletedProject = `Wonder completed: ${wonderDefinition.name}`;
 
   state.gameLog.push(`Wonder completed: ${wonderDefinition.name} in ${city.name}`);
   state.gameLog.push(`Project completed: ${project.name}`);
@@ -520,6 +562,7 @@ export function createInitialGameState() {
     ],
     availableCityNames,
     wonders: [],
+    completedWonders: [],
     leaders: [],
     advances: selectedAdvance ? [selectedAdvance.id] : [],
     idCounters: {
@@ -535,6 +578,9 @@ export function createInitialGameState() {
     lastWarSummary: null,
     gameLog,
     gameOver: false,
+    finalScore: null,
+    lastUnlockedAdvance: null,
+    lastCompletedProject: null,
     currentPhase: "ready",
   };
 }
@@ -579,6 +625,12 @@ function runHarvestPhase(state) {
 
   state.food += foodProduced;
   state.gameLog.push(`Harvest produced ${foodProduced} food`);
+
+  if (hasWonder(state, "colossus")) {
+    const bonusGold = rollDie(6);
+    state.gold += bonusGold;
+    state.gameLog.push(`Colossus generated ${bonusGold} gold`);
+  }
 }
 
 function getRandomDisaster() {
@@ -676,7 +728,9 @@ export function resolveDisasterCheck(state) {
     case "mad-king":
     case "pestilence": {
       const baseLoss = sumDice(disaster.effect.diceCount, disaster.effect.diceSides);
-      const mitigation = Boolean(mitigationByAdvance || mitigationByWonder);
+      const unrestWonderMitigation = disaster.id === "unrest" && hasWonder(state, "hanging-gardens");
+      const anarchyWonderMitigation = disaster.id === "anarchy" && hasWonder(state, "pyramids");
+      const mitigation = Boolean(mitigationByAdvance || mitigationByWonder || unrestWonderMitigation || anarchyWonderMitigation);
       if (mitigation) {
         state.gameLog.push(`${disaster.name} mitigated by ${disaster.mitigationAdvanceId || disaster.mitigationWonderId}`);
       }
@@ -684,10 +738,10 @@ export function resolveDisasterCheck(state) {
       break;
     }
     case "heresy": {
-      const hasReligion = hasAdvance(state, "religion");
-      const baseLoss = hasReligion ? sumDice(1, 6) : sumDice(2, 6);
-      if (hasReligion) {
-        state.gameLog.push("Heresy reduced by Religion");
+      const mitigated = hasAdvance(state, "religion") || hasAdvance(state, "philosophy") || hasWonder(state, "parthenon");
+      const baseLoss = mitigated ? sumDice(1, 6) : sumDice(2, 6);
+      if (mitigated) {
+        state.gameLog.push("Heresy mitigated by Religion/Philosophy/Parthenon");
       }
       losePopulation(state, baseLoss, "Heresy");
       break;
@@ -744,6 +798,7 @@ export function resolveDisasterCheck(state) {
 }
 
 function runUpkeepPhase(state) {
+  const reserveBeforeUpkeep = state.food;
   let foodConsumed = Math.min(state.food, state.populationTotal);
   state.food -= foodConsumed;
 
@@ -764,6 +819,14 @@ function runUpkeepPhase(state) {
   }
 
   state.gameLog.push(`Upkeep consumed ${foodConsumed} food and ${goldConsumed} gold`);
+
+  if (!hasAdvance(state, "pottery")) {
+    state.food = 0;
+    state.gameLog.push("Food reserve reset (no Pottery)");
+  } else {
+    state.gameLog.push(`Food reserve kept by Pottery: ${state.food} (from ${reserveBeforeUpkeep})`);
+  }
+
   syncPopulationAssignments(state);
 }
 
@@ -799,10 +862,6 @@ function getPlayerBattleDiceCount(state) {
   }
 
   battleDice += countLeadersByType(state, "general");
-
-  if (hasWonder(state, "great-wall")) {
-    battleDice += 1;
-  }
 
   return battleDice;
 }
@@ -881,7 +940,8 @@ function resolveWarPhase(state) {
 
     war.currentSegment = segment;
 
-    const playerRolls = rollMultipleDice(getPlayerBattleDiceCount(state), 6);
+    const defensiveBonus = hasWonder(state, "great-wall") ? 1 : 0;
+    const playerRolls = rollMultipleDice(getPlayerBattleDiceCount(state) + defensiveBonus, 6);
     const enemyRolls = rollMultipleDice(3, 6);
     const playerHits = countBattleHits(playerRolls);
     const enemyHits = countBattleHits(enemyRolls);
@@ -1025,6 +1085,7 @@ export function resolveResearchPhase(state) {
     }
 
     state.advances.push(unlockedAdvance.id);
+    state.lastUnlockedAdvance = unlockedAdvance.name;
     state.gameLog.push(`Research breakthrough: ${unlockedAdvance.name}`);
   }
 }
@@ -1038,6 +1099,26 @@ function getTradeIncomePreview(state) {
     coinageBonus: hasAdvance(state, "coinage") ? cityCount : 0,
     navigationBonus: hasAdvance(state, "navigation") ? cityCount : 0,
     rulerCount: countLeadersByType(state, "ruler"),
+  };
+}
+
+function getAdvanceScore(state) {
+  return state.advances.reduce((sum, advanceId) => {
+    const definition = findAdvanceById(advanceId);
+    return sum + (definition?.victoryPoints || 1);
+  }, 0);
+}
+
+export function calculateFinalScore(state) {
+  const advancePoints = getAdvanceScore(state);
+  const cityPoints = getCityCount(state) * 5;
+  const wonderPoints = state.completedWonders.length * 15;
+
+  return {
+    advancePoints,
+    cityPoints,
+    wonderPoints,
+    total: advancePoints + cityPoints + wonderPoints,
   };
 }
 
@@ -1138,6 +1219,8 @@ export function nextTurn(state) {
   }
 
   if (state.currentPhase === "ready") {
+    state.lastUnlockedAdvance = null;
+    state.lastCompletedProject = null;
     startPopulationIncreasePhase(state);
     state.currentPhase = "distribution";
     return state;
@@ -1175,12 +1258,27 @@ export function nextTurn(state) {
 
     resolveResearchPhase(state);
 
+    const turnSummary = [
+      `Turn ${state.turn}`,
+      `Population increase resolved`,
+      `Harvest resolved`,
+      `Upkeep resolved`,
+      `Trade resolved`,
+      `Build: ${state.currentProject ? "project advanced" : "no active project"}`,
+      `Research: ${getTotalResearchRolls(state)} rolls`,
+      "------------------------------",
+    ];
+    turnSummary.forEach((line) => state.gameLog.push(line));
+
     state.turn += 1;
     state.currentPhase = "ready";
 
+    enforceStateInvariants(state);
+
     if (state.turn > state.maxTurns) {
       state.gameOver = true;
-      state.gameLog.push("Raggiunto il limite massimo di turni. Fine partita.");
+      state.finalScore = calculateFinalScore(state);
+      state.gameLog.push("Game finished after 50 turns");
     }
   }
 
