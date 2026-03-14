@@ -1,14 +1,14 @@
-import { ADVANCES, CITY_NAMES, CULTURES, LEADERS, WONDERS } from "./gameData.js";
+import { ADVANCES, CITY_NAMES, CULTURES, DISASTERS, LEADERS, WONDERS } from "./gameData.js";
 
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
+const POPULATION_LOSS_ORDER = ["agriculture", "trade", "labor", "scholars", "army"];
 
-function pickRandomItem(values) {
+export function getRandomItem(values) {
   if (!Array.isArray(values) || values.length === 0) {
     return null;
   }
 
-  const randomIndex = Math.floor(Math.random() * values.length);
-  return values[randomIndex];
+  return values[Math.floor(Math.random() * values.length)];
 }
 
 function removeOneValue(values, valueToRemove) {
@@ -117,6 +117,139 @@ export function rollTwoDice() {
   return rollDie(6) + rollDie(6);
 }
 
+export function rollMultipleDice(count, sides) {
+  const rolls = [];
+  for (let index = 0; index < count; index += 1) {
+    rolls.push(rollDie(sides));
+  }
+  return rolls;
+}
+
+export function sumDice(count, sides) {
+  return rollMultipleDice(count, sides).reduce((sum, value) => sum + value, 0);
+}
+
+function syncPopulationAssignments(state) {
+  const total = sumAssignments(state.populationAssignments);
+  if (total === state.populationTotal) {
+    return;
+  }
+
+  if (total < state.populationTotal) {
+    state.populationAssignments.agriculture += state.populationTotal - total;
+    return;
+  }
+
+  let overflow = total - state.populationTotal;
+  for (const role of POPULATION_LOSS_ORDER) {
+    if (overflow <= 0) {
+      break;
+    }
+
+    const current = state.populationAssignments[role] || 0;
+    const removal = Math.min(current, overflow);
+    state.populationAssignments[role] -= removal;
+    overflow -= removal;
+  }
+}
+
+export function losePopulation(state, amount, reason) {
+  const finalLoss = Math.max(0, Math.min(Math.floor(amount), state.populationTotal));
+  if (finalLoss <= 0) {
+    state.gameLog.push(`Population lost: 0 (${reason})`);
+    return 0;
+  }
+
+  let remaining = finalLoss;
+  for (const role of POPULATION_LOSS_ORDER) {
+    if (remaining <= 0) {
+      break;
+    }
+
+    const current = state.populationAssignments[role] || 0;
+    const removed = Math.min(current, remaining);
+    state.populationAssignments[role] -= removed;
+    remaining -= removed;
+  }
+
+  state.populationTotal -= finalLoss;
+  syncPopulationAssignments(state);
+  state.gameLog.push(`Population lost: ${finalLoss} (${reason})`);
+  return finalLoss;
+}
+
+function loseArmyPopulation(state, amount) {
+  const currentArmy = state.populationAssignments.army || 0;
+  const loss = Math.max(0, Math.min(amount, currentArmy));
+  if (loss <= 0) {
+    return 0;
+  }
+
+  state.populationAssignments.army -= loss;
+  state.populationTotal -= loss;
+  syncPopulationAssignments(state);
+  return loss;
+}
+
+export function loseFood(state, amount, reason) {
+  const finalLoss = Math.max(0, Math.min(Math.floor(amount), state.food));
+  state.food -= finalLoss;
+  state.gameLog.push(`Food lost: ${finalLoss} (${reason})`);
+  return finalLoss;
+}
+
+export function loseGold(state, amount, reason) {
+  const finalLoss = Math.max(0, Math.min(Math.floor(amount), state.gold));
+  state.gold -= finalLoss;
+  state.gameLog.push(`Gold lost: ${finalLoss} (${reason})`);
+  return finalLoss;
+}
+
+export function loseRandomCity(state, reason) {
+  if (state.cities.length === 0) {
+    state.gameLog.push(`No city lost (${reason})`);
+    return null;
+  }
+
+  const city = getRandomItem(state.cities);
+  state.cities = state.cities.filter((item) => item.id !== city.id);
+
+  if (city.wonderId) {
+    state.wonders = state.wonders.filter((wonder) => wonder.id !== city.wonderId);
+    state.gameLog.push(`City lost with wonder: ${city.name} (${city.wonderId})`);
+  }
+
+  state.gameLog.push(`City lost: ${city.name} (${reason})`);
+  return city;
+}
+
+export function loseRandomWonder(state, reason) {
+  if (state.wonders.length === 0) {
+    state.gameLog.push(`No wonder lost (${reason})`);
+    return null;
+  }
+
+  const wonder = getRandomItem(state.wonders);
+  state.wonders = state.wonders.filter((item) => item.id !== wonder.id);
+
+  const hostCity = state.cities.find((city) => city.id === wonder.cityId);
+  if (hostCity) {
+    hostCity.wonderId = null;
+  }
+
+  state.gameLog.push(`Wonder lost: ${wonder.name} (${reason})`);
+  return wonder;
+}
+
+function applyPopulationDisaster(state, baseLoss, mitigationActive, mitigationLabel) {
+  let finalLoss = baseLoss;
+  if (mitigationActive) {
+    finalLoss = Math.floor(baseLoss / 2);
+  }
+
+  losePopulation(state, finalLoss, state.lastDisaster?.name || "Disaster");
+}
+
 function getConstructionCost(state, laborBase, goldBase) {
   const laborRequired = hasAdvance(state, "engineering") ? Math.floor(laborBase * 0.8) : laborBase;
   const goldCost = hasAdvance(state, "architecture") ? Math.floor(goldBase * 0.8) : goldBase;
@@ -150,7 +283,7 @@ export function getUnusedCityName(state) {
     return `City ${state.cities.length + 1}`;
   }
 
-  const name = pickRandomItem(state.availableCityNames);
+  const name = getRandomItem(state.availableCityNames);
   removeOneValue(state.availableCityNames, name);
   return name;
 }
@@ -338,18 +471,15 @@ export function resolveBuildPhase(state) {
   state.currentProject = null;
 }
 
-/**
- * Crea lo stato iniziale del gioco.
- */
 export function createInitialGameState() {
-  const selectedCulture = pickRandomItem(CULTURES);
+  const selectedCulture = getRandomItem(CULTURES);
   const availableCityNames = [...CITY_NAMES];
 
   const selectedAdvance = selectedCulture
     ? findAdvanceById(selectedCulture.startingAdvanceId)
     : null;
 
-  const firstCityName = pickRandomItem(availableCityNames) || "Founding City";
+  const firstCityName = getRandomItem(availableCityNames) || "Founding City";
   removeOneValue(availableCityNames, firstCityName);
 
   const populationAssignments = {
@@ -399,6 +529,10 @@ export function createInitialGameState() {
     },
     skipBuildPhase: false,
     currentProject: null,
+    pendingWar: null,
+    surrenderIfWar: false,
+    lastDisaster: null,
+    lastWarSummary: null,
     gameLog,
     gameOver: false,
     currentPhase: "ready",
@@ -414,7 +548,6 @@ function startPopulationIncreasePhase(state) {
 
   state.populationTotal += populationGain;
   state.populationAssignments.agriculture += populationGain;
-
   state.gameLog.push(`Population increased by ${populationGain}`);
 }
 
@@ -448,26 +581,178 @@ function runHarvestPhase(state) {
   state.gameLog.push(`Harvest produced ${foodProduced} food`);
 }
 
+function getRandomDisaster() {
+  const roll = rollDie(20);
+  const disaster = DISASTERS.find((item) => roll >= item.rollMin && roll <= item.rollMax);
+  return { roll, disaster: disaster || null };
+}
+
+function createSpecialWarFromDisaster(disasterId, mitigationApplied) {
+  const baseEnemyArmies = rollDie(6);
+  const enemyArmies = disasterId === "civil-war" && mitigationApplied
+    ? Math.max(1, Math.floor(baseEnemyArmies / 2))
+    : baseEnemyArmies;
+
+  const mapping = {
+    "civil-war": {
+      type: "civil-war",
+      name: "Civil War",
+      onEnemyVictoryEffect: "lose_random_city",
+    },
+    uprising: {
+      type: "uprising",
+      name: "Uprising",
+      onEnemyVictoryEffect: "lose_population_2d6",
+    },
+    barbarians: {
+      type: "barbarians",
+      name: "Barbarians",
+      onEnemyVictoryEffect: "lose_all_gold",
+    },
+  };
+
+  const details = mapping[disasterId];
+  if (!details) {
+    return null;
+  }
+
+  return {
+    ...details,
+    enemyArmies,
+    remainingEnemyArmies: enemyArmies,
+    maxSegments: rollDie(6),
+    currentSegment: 0,
+    playerLossesInflicted: 0,
+    playerLossesSuffered: 0,
+  };
+}
+
+export function resolveDisasterCheck(state) {
+  state.skipBuildPhase = false;
+  state.pendingWar = null;
+  state.lastDisaster = null;
+  state.lastWarSummary = null;
+
+  const checkRoll = rollTwoDice();
+  state.gameLog.push(`Disaster check roll: ${checkRoll}`);
+
+  if (checkRoll === 2) {
+    state.pendingWar = createNormalWar(state);
+    state.gameLog.push("War triggered");
+    return;
+  }
+
+  if (checkRoll !== 12) {
+    state.gameLog.push("No disaster this turn");
+    return;
+  }
+
+  state.skipBuildPhase = true;
+
+  const { roll, disaster } = getRandomDisaster();
+  if (!disaster) {
+    state.gameLog.push("No disaster this turn");
+    return;
+  }
+
+  state.lastDisaster = {
+    id: disaster.id,
+    name: disaster.name,
+    roll,
+  };
+
+  state.gameLog.push(`Disaster triggered: ${disaster.name}`);
+  state.gameLog.push(`Disaster table roll: ${roll}`);
+
+  const mitigationByAdvance = disaster.mitigationAdvanceId && hasAdvance(state, disaster.mitigationAdvanceId);
+  const mitigationByWonder = disaster.mitigationWonderId && hasWonder(state, disaster.mitigationWonderId);
+
+  switch (disaster.id) {
+    case "flood":
+    case "earthquake":
+    case "unrest":
+    case "anarchy":
+    case "epidemic":
+    case "mad-king":
+    case "pestilence": {
+      const baseLoss = sumDice(disaster.effect.diceCount, disaster.effect.diceSides);
+      const mitigation = Boolean(mitigationByAdvance || mitigationByWonder);
+      if (mitigation) {
+        state.gameLog.push(`${disaster.name} mitigated by ${disaster.mitigationAdvanceId || disaster.mitigationWonderId}`);
+      }
+      applyPopulationDisaster(state, baseLoss, mitigation, disaster.mitigationAdvanceId || disaster.mitigationWonderId);
+      break;
+    }
+    case "heresy": {
+      const hasReligion = hasAdvance(state, "religion");
+      const baseLoss = hasReligion ? sumDice(1, 6) : sumDice(2, 6);
+      if (hasReligion) {
+        state.gameLog.push("Heresy reduced by Religion");
+      }
+      losePopulation(state, baseLoss, "Heresy");
+      break;
+    }
+    case "volcano":
+      loseRandomCity(state, "Volcano");
+      break;
+    case "sands-of-time":
+      loseRandomWonder(state, "Sands of Time");
+      break;
+    case "pirates": {
+      const baseLoss = Math.floor(state.gold / 2);
+      loseGold(state, baseLoss, "Pirates");
+      break;
+    }
+    case "famine":
+    case "drought": {
+      const baseLoss = Math.floor(state.food / 2);
+      const finalLoss = mitigationByAdvance ? Math.floor(baseLoss / 2) : baseLoss;
+      if (mitigationByAdvance) {
+        state.gameLog.push(`${disaster.name} mitigated by Pottery`);
+      }
+      loseFood(state, finalLoss, disaster.name);
+      break;
+    }
+    case "corruption": {
+      if (mitigationByWonder) {
+        state.gameLog.push("Corruption mitigated by Oracle");
+      } else {
+        loseGold(state, state.gold, "Corruption");
+      }
+      break;
+    }
+    case "hurricane": {
+      if (mitigationByWonder) {
+        state.gameLog.push("Hurricane mitigated by Lighthouse");
+      } else {
+        losePopulation(state, sumDice(1, 6), "Hurricane");
+      }
+      break;
+    }
+    case "civil-war":
+    case "uprising":
+    case "barbarians": {
+      if (disaster.id === "civil-war" && mitigationByAdvance) {
+        state.gameLog.push("Civil War mitigated by Democracy");
+      }
+      state.pendingWar = createSpecialWarFromDisaster(disaster.id, Boolean(mitigationByAdvance));
+      break;
+    }
+    default:
+      break;
+  }
+}
+
 function runUpkeepPhase(state) {
   let foodConsumed = Math.min(state.food, state.populationTotal);
   state.food -= foodConsumed;
 
   if (foodConsumed < state.populationTotal) {
     const missingFood = state.populationTotal - foodConsumed;
-    state.populationTotal -= missingFood;
-
-    for (let index = 0; index < missingFood; index += 1) {
-      const roleToReduce = findRoleForDecrease(state);
-      if (!roleToReduce) {
-        break;
-      }
-      state.populationAssignments[roleToReduce] -= 1;
-    }
-
-    state.gameLog.push(`Population lost due to starvation: ${missingFood}`);
+    losePopulation(state, missingFood, "Starvation");
   }
 
-  let armyPopulation = state.populationAssignments.army;
+  const armyPopulation = state.populationAssignments.army;
   let goldConsumed = Math.min(state.gold, armyPopulation);
   state.gold -= goldConsumed;
 
@@ -475,16 +760,11 @@ function runUpkeepPhase(state) {
     const unpaidArmy = armyPopulation - goldConsumed;
     state.populationAssignments.army -= unpaidArmy;
     state.populationAssignments.agriculture += unpaidArmy;
-    armyPopulation = state.populationAssignments.army;
-    goldConsumed = armyPopulation;
+    goldConsumed = state.populationAssignments.army;
   }
 
   state.gameLog.push(`Upkeep consumed ${foodConsumed} food and ${goldConsumed} gold`);
-
-  const assignmentTotal = sumAssignments(state.populationAssignments);
-  if (assignmentTotal !== state.populationTotal) {
-    state.populationAssignments.agriculture += state.populationTotal - assignmentTotal;
-  }
+  syncPopulationAssignments(state);
 }
 
 function runLeaderAgingPhase(state) {
@@ -501,6 +781,159 @@ function runLeaderAgingPhase(state) {
   });
 
   state.leaders = survivors;
+}
+
+function getPlayerBattleDiceCount(state) {
+  let battleDice = 3;
+
+  if (hasAdvance(state, "metal-working")) {
+    battleDice += 1;
+  }
+
+  if (hasAdvance(state, "military-doctrine")) {
+    battleDice += 1;
+  }
+
+  if (hasAdvance(state, "equestrian")) {
+    battleDice += 1;
+  }
+
+  battleDice += countLeadersByType(state, "general");
+
+  if (hasWonder(state, "great-wall")) {
+    battleDice += 1;
+  }
+
+  return battleDice;
+}
+
+function countBattleHits(rolls) {
+  return rolls.filter((roll) => roll === 6).length;
+}
+
+function createNormalWar(state) {
+  const enemyArmies = sumDice(4, 6);
+
+  return {
+    type: "normal",
+    name: "War",
+    enemyArmies,
+    remainingEnemyArmies: enemyArmies,
+    maxSegments: rollDie(6),
+    currentSegment: 0,
+    playerLossesInflicted: 0,
+    playerLossesSuffered: 0,
+    onEnemyVictoryEffect: "lose_gold_2d6",
+  };
+}
+
+function applyEnemyVictoryEffect(state, war) {
+  if (war.type === "normal" || war.onEnemyVictoryEffect === "lose_gold_2d6") {
+    const goldLoss = sumDice(2, 6);
+    loseGold(state, goldLoss, "War defeat");
+    return;
+  }
+
+  if (war.onEnemyVictoryEffect === "lose_random_city") {
+    loseRandomCity(state, war.name);
+    return;
+  }
+
+  if (war.onEnemyVictoryEffect === "lose_population_2d6") {
+    losePopulation(state, sumDice(2, 6), war.name);
+    return;
+  }
+
+  if (war.onEnemyVictoryEffect === "lose_all_gold") {
+    loseGold(state, state.gold, war.name);
+  }
+}
+
+function resolveWarPhase(state) {
+  const war = state.pendingWar;
+  if (!war) {
+    return;
+  }
+
+  const startingEnemyArmies = war.enemyArmies;
+
+  if (state.surrenderIfWar) {
+    const goldLoss = sumDice(2, 6);
+    loseGold(state, goldLoss, "Surrender");
+    state.gameLog.push(`Player surrendered and lost ${goldLoss} gold`);
+    state.lastWarSummary = {
+      type: war.type,
+      name: war.name,
+      enemyArmies: startingEnemyArmies,
+      maxSegments: war.maxSegments,
+      result: "Surrender",
+    };
+    state.pendingWar = null;
+    return;
+  }
+
+  state.gameLog.push(`War started: ${war.name} (${war.enemyArmies} enemy armies, ${war.maxSegments} segments)`);
+
+  for (let segment = 1; segment <= war.maxSegments; segment += 1) {
+    if (war.remainingEnemyArmies <= 0 || state.populationAssignments.army <= 0) {
+      break;
+    }
+
+    war.currentSegment = segment;
+
+    const playerRolls = rollMultipleDice(getPlayerBattleDiceCount(state), 6);
+    const enemyRolls = rollMultipleDice(3, 6);
+    const playerHits = countBattleHits(playerRolls);
+    const enemyHits = countBattleHits(enemyRolls);
+
+    state.gameLog.push(
+      `War segment ${segment}: player rolls [${playerRolls.join(",")}], enemy rolls [${enemyRolls.join(",")}]`
+    );
+    state.gameLog.push(`Player inflicted ${playerHits} loss, enemy inflicted ${enemyHits} losses`);
+
+    war.remainingEnemyArmies = Math.max(0, war.remainingEnemyArmies - playerHits);
+    const playerArmyLosses = loseArmyPopulation(state, enemyHits);
+
+    war.playerLossesInflicted += playerHits;
+    war.playerLossesSuffered += playerArmyLosses;
+
+    state.gameLog.push(
+      `Remaining armies - Player: ${state.populationAssignments.army}, Enemy: ${war.remainingEnemyArmies}`
+    );
+  }
+
+  let result = "Tactical draw";
+
+  if (state.populationAssignments.army <= 0 && war.remainingEnemyArmies > 0) {
+    applyEnemyVictoryEffect(state, war);
+    result = "Enemy victory";
+
+    if (war.type === "barbarians") {
+      state.gameLog.push("Barbarians won: all gold lost");
+    }
+  } else if (war.remainingEnemyArmies <= 0 && state.populationAssignments.army > 0) {
+    result = "Player victory";
+    state.gameLog.push(`War won: ${war.name}`);
+  } else {
+    const goldWon = Math.max(0, war.playerLossesInflicted - war.playerLossesSuffered);
+    if (goldWon > 0) {
+      state.gold += goldWon;
+      result = `Points victory (+${goldWon} gold)`;
+      state.gameLog.push(`War ended on points: player won ${goldWon} gold`);
+    } else {
+      state.gameLog.push("War ended in tactical draw");
+    }
+  }
+
+  state.lastWarSummary = {
+    type: war.type,
+    name: war.name,
+    enemyArmies: startingEnemyArmies,
+    maxSegments: war.maxSegments,
+    result,
+  };
+
+  state.pendingWar = null;
 }
 
 function runTradePhase(state) {
@@ -524,7 +957,6 @@ function runTradePhase(state) {
     `Trade generated ${totalGold} gold (${preview.tradePopulation} from trade, ${preview.citiesGold} from cities, ${preview.coinageBonus} from Coinage, ${preview.navigationBonus} from Navigation, ${rulersGold} from Rulers)`
   );
 }
-
 
 export function getResearchBonusFromAdvances(state) {
   let bonus = 0;
@@ -571,7 +1003,7 @@ export function getResearchRollBreakdown(state) {
 
 export function getRandomAvailableAdvance(state) {
   const availableAdvances = ADVANCES.filter((advance) => !hasAdvance(state, advance.id));
-  return pickRandomItem(availableAdvances) || null;
+  return getRandomItem(availableAdvances) || null;
 }
 
 export function resolveResearchPhase(state) {
@@ -608,7 +1040,6 @@ function getTradeIncomePreview(state) {
     rulerCount: countLeadersByType(state, "ruler"),
   };
 }
-
 
 export function canIncreasePopulationRole(state, role) {
   if (!POPULATION_ROLES.includes(role)) {
@@ -713,22 +1144,35 @@ export function nextTurn(state) {
   }
 
   if (state.currentPhase === "distribution") {
-    // Ordine turno:
-    // 1) Population Increase (già fatto al click precedente)
-    // 2) Population Distribution (gestita dalla UI)
-    // 3) Gain Leader
-    // 4) Harvest
-    // 5) Upkeep
-    // 6) Leader aging
-    // 7) Trade
-    // 8) Build
-    // 9) Research
+    // 1 Population Increase (già eseguita)
+    // 2 Population Distribution (UI)
+    // 3 Gain Leader
+    // 4 Harvest
+    // 5 Disaster Check
+    // 6 Upkeep
+    // 7 Leader aging
+    // 8 War (se presente)
+    // 9 Trade
+    // 10 Build
+    // 11 Research
     runGainLeaderPhase(state);
     runHarvestPhase(state);
+    resolveDisasterCheck(state);
     runUpkeepPhase(state);
     runLeaderAgingPhase(state);
+
+    if (state.pendingWar) {
+      resolveWarPhase(state);
+    }
+
     runTradePhase(state);
-    resolveBuildPhase(state);
+
+    if (state.skipBuildPhase) {
+      state.gameLog.push("Build phase skipped due to disaster");
+    } else {
+      resolveBuildPhase(state);
+    }
+
     resolveResearchPhase(state);
 
     state.turn += 1;

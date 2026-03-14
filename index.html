@@ -21,6 +21,9 @@
         <p><strong>Fase:</strong> <span id="phase-value">-</span></p>
         <p><strong>Game Over:</strong> <span id="game-over-value">No</span></p>
         <p><strong>Progetto corrente:</strong> <span id="project-value">Nessuno</span></p>
+        <p><strong>Ultimo disaster:</strong> <span id="last-disaster-value">Nessuno</span></p>
+        <p><strong>Ultima guerra:</strong> <span id="last-war-value">Nessuna</span></p>
+        <p><strong>Build saltata:</strong> <span id="build-skipped-value">No</span></p>
       </section>
 
       <section class="card" aria-labelledby="resources-title">
@@ -115,6 +118,9 @@
       <section class="card" aria-labelledby="controls-title">
         <h2 id="controls-title">Controlli turno</h2>
         <p id="turn-help-text">Avvia il ciclo economico del turno.</p>
+        <label class="inline-check" for="surrender-if-war-checkbox">
+          <input id="surrender-if-war-checkbox" type="checkbox" /> Surrender if war occurs
+        </label>
         <button id="end-turn-button" type="button">Avvia turno economico</button>
       </section>
 
