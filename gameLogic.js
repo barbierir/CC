@@ -1,4 +1,4 @@
-import { ADVANCES, CITY_NAMES, CULTURES } from "./gameData.js";
+import { ADVANCES, CITY_NAMES, CULTURES, LEADERS } from "./gameData.js";
 
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
 
@@ -26,8 +26,23 @@ function sumAssignments(assignments) {
   return POPULATION_ROLES.reduce((sum, role) => sum + (assignments[role] || 0), 0);
 }
 
-function hasAdvance(state, advanceId) {
+export function hasAdvance(state, advanceId) {
   return state.advances.includes(advanceId);
+}
+
+export function countLeadersByType(state, leaderType) {
+  return state.leaders.filter((leader) => leader.id === leaderType).length;
+}
+
+export function getCityCount(state) {
+  return state.cities.length;
+}
+
+export function generateUniqueId(state, prefix) {
+  const currentValue = state.idCounters[prefix] || 0;
+  const nextValue = currentValue + 1;
+  state.idCounters[prefix] = nextValue;
+  return `${prefix}-${nextValue}`;
 }
 
 function getFoodPerAgricultureUnit(state) {
@@ -66,6 +81,15 @@ function findRoleForIncrease(state, excludedRoles = []) {
 
     return canRoleIncreaseWithinLimit(state, role);
   });
+}
+
+function findLeaderTemplateByTypeRoll() {
+  while (true) {
+    const typeRoll = rollDie(6);
+    if (typeRoll >= 1 && typeRoll <= 4) {
+      return LEADERS[typeRoll - 1];
+    }
+  }
 }
 
 export function rollDie(sides) {
@@ -131,6 +155,9 @@ export function createInitialGameState() {
     wonders: [],
     leaders: [],
     advances: selectedAdvance ? [selectedAdvance.id] : [],
+    idCounters: {
+      leader: 0,
+    },
     skipBuildPhase: false,
     currentProject: null,
     projectProgress: 0,
@@ -151,6 +178,27 @@ function startPopulationIncreasePhase(state) {
   state.populationAssignments.agriculture += populationGain;
 
   state.gameLog.push(`Population increased by ${populationGain}`);
+}
+
+function runGainLeaderPhase(state) {
+  const gainRoll = rollDie(6);
+
+  if (gainRoll >= 3) {
+    state.gameLog.push("No new leader this turn");
+    return;
+  }
+
+  const leaderTemplate = findLeaderTemplateByTypeRoll();
+  const newLeader = {
+    uniqueId: generateUniqueId(state, "leader"),
+    id: leaderTemplate.id,
+    name: leaderTemplate.name,
+    description: leaderTemplate.description,
+    effectType: leaderTemplate.effectType,
+  };
+
+  state.leaders.push(newLeader);
+  state.gameLog.push(`A new leader appeared: ${newLeader.name}`);
 }
 
 function runHarvestPhase(state) {
@@ -199,6 +247,57 @@ function runUpkeepPhase(state) {
   if (assignmentTotal !== state.populationTotal) {
     state.populationAssignments.agriculture += state.populationTotal - assignmentTotal;
   }
+}
+
+// Sequenza scelta: Harvest -> Upkeep -> Leader aging -> Trade.
+function runLeaderAgingPhase(state) {
+  const survivors = [];
+
+  state.leaders.forEach((leader) => {
+    const agingRoll = rollDie(6);
+    if (agingRoll === 1) {
+      state.gameLog.push(`Leader died of old age: ${leader.name}`);
+      return;
+    }
+
+    survivors.push(leader);
+  });
+
+  state.leaders = survivors;
+}
+
+function runTradePhase(state) {
+  const preview = getTradeIncomePreview(state);
+
+  let rulersGold = 0;
+  for (let index = 0; index < preview.rulerCount; index += 1) {
+    rulersGold += rollDie(6);
+  }
+
+  const totalGold =
+    preview.tradePopulation +
+    preview.citiesGold +
+    preview.coinageBonus +
+    preview.navigationBonus +
+    rulersGold;
+
+  state.gold += totalGold;
+
+  state.gameLog.push(
+    `Trade generated ${totalGold} gold (${preview.tradePopulation} from trade, ${preview.citiesGold} from cities, ${preview.coinageBonus} from Coinage, ${preview.navigationBonus} from Navigation, ${rulersGold} from Rulers)`
+  );
+}
+
+function getTradeIncomePreview(state) {
+  const cityCount = getCityCount(state);
+
+  return {
+    tradePopulation: state.populationAssignments.trade || 0,
+    citiesGold: cityCount,
+    coinageBonus: hasAdvance(state, "coinage") ? cityCount : 0,
+    navigationBonus: hasAdvance(state, "navigation") ? cityCount : 0,
+    rulerCount: countLeadersByType(state, "ruler"),
+  };
 }
 
 export function applyPopulationChange(state, role, delta) {
@@ -260,7 +359,7 @@ export function applyPopulationChange(state, role, delta) {
 /**
  * Loop turno economico base in 2 step:
  * - click 1: Population Increase e avvio Distribution
- * - click 2: conferma Distribution, poi Harvest + Upkeep
+ * - click 2: conferma Distribution e risoluzione fasi economiche
  */
 export function nextTurn(state) {
   if (state.gameOver) {
@@ -275,8 +374,18 @@ export function nextTurn(state) {
   }
 
   if (state.currentPhase === "distribution") {
+    // Ordine turno attuale:
+    // 1) Population Increase (già fatto al click precedente)
+    // 2) Population Distribution (gestita dalla UI)
+    // 3) Gain Leader
+    // 4) Harvest
+    // 5) Upkeep
+    // 6) Trade (dopo aging leader)
+    runGainLeaderPhase(state);
     runHarvestPhase(state);
     runUpkeepPhase(state);
+    runLeaderAgingPhase(state);
+    runTradePhase(state);
 
     state.turn += 1;
     state.currentPhase = "ready";
@@ -292,10 +401,33 @@ export function nextTurn(state) {
 
 export function getEconomyPreview(state) {
   const foodPerUnit = getFoodPerAgricultureUnit(state);
+  const tradePreview = getTradeIncomePreview(state);
+
+  const fixedTradeGold =
+    tradePreview.tradePopulation +
+    tradePreview.citiesGold +
+    tradePreview.coinageBonus +
+    tradePreview.navigationBonus;
+
+  const rulerMinGold = tradePreview.rulerCount;
+  const rulerMaxGold = tradePreview.rulerCount * 6;
 
   return {
     foodProduction: state.populationAssignments.agriculture * foodPerUnit,
     foodUpkeep: state.populationTotal,
     armyGoldUpkeep: state.populationAssignments.army,
+    tradePopulationGold: tradePreview.tradePopulation,
+    citiesGold: tradePreview.citiesGold,
+    coinageGold: tradePreview.coinageBonus,
+    navigationGold: tradePreview.navigationBonus,
+    rulerCount: tradePreview.rulerCount,
+    rulerGoldRange: {
+      min: rulerMinGold,
+      max: rulerMaxGold,
+    },
+    tradeGoldRange: {
+      min: fixedTradeGold + rulerMinGold,
+      max: fixedTradeGold + rulerMaxGold,
+    },
   };
 }

@@ -1,6 +1,6 @@
 // Cataloghi statici del gioco.
-// In questo step includono culture, advances e nomi città completi
-// per consentire un setup iniziale realistico.
+// In questo step includono culture, advances, leader e nomi città
+// per consentire un setup iniziale realistico ed economia base.
 
 export const CULTURES = [
   { id: "egyptian", name: "Egyptian", startingAdvanceId: "engineering" },
@@ -140,7 +140,32 @@ export const ADVANCES = [
   },
 ];
 
-export const LEADERS = [];
+export const LEADERS = [
+  {
+    id: "ruler",
+    name: "Ruler",
+    description: "+1D6 gold per turn",
+    effectType: "gold_bonus",
+  },
+  {
+    id: "general",
+    name: "General",
+    description: "+1 battle roll per turn",
+    effectType: "battle_roll_bonus",
+  },
+  {
+    id: "thinker",
+    name: "Thinker",
+    description: "+1 research roll per turn",
+    effectType: "research_roll_bonus",
+  },
+  {
+    id: "builder",
+    name: "Builder",
+    description: "+1D6 labor per turn",
+    effectType: "labor_bonus",
+  },
+];
 
 export const WONDERS = [];
 
