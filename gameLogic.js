@@ -1,57 +1,84 @@
-import { CITY_NAMES, CULTURES } from "./gameData.js";
+import { ADVANCES, CITY_NAMES, CULTURES } from "./gameData.js";
 
-/**
- * Restituisce il primo elemento di un array o un fallback.
- */
-function firstOrFallback(values, fallback) {
-  return Array.isArray(values) && values.length > 0 ? values[0] : fallback;
+function pickRandomItem(values) {
+  if (!Array.isArray(values) || values.length === 0) {
+    return null;
+  }
+
+  const randomIndex = Math.floor(Math.random() * values.length);
+  return values[randomIndex];
+}
+
+function removeOneValue(values, valueToRemove) {
+  const index = values.indexOf(valueToRemove);
+  if (index >= 0) {
+    values.splice(index, 1);
+  }
+}
+
+function findAdvanceById(advanceId) {
+  return ADVANCES.find((advance) => advance.id === advanceId) || null;
 }
 
 /**
  * Crea lo stato iniziale del gioco.
  */
 export function createInitialGameState() {
-  const startingCulture = firstOrFallback(CULTURES, {
-    id: "placeholder",
-    name: "Unknown",
-    startingAdvanceIds: [],
-  });
+  const selectedCulture = pickRandomItem(CULTURES);
+  const availableCityNames = [...CITY_NAMES];
 
-  const startingCityName = firstOrFallback(
-    CITY_NAMES[startingCulture.id],
-    "Founding City"
-  );
+  const selectedAdvance = selectedCulture
+    ? findAdvanceById(selectedCulture.startingAdvanceId)
+    : null;
+
+  const firstCityName = pickRandomItem(availableCityNames) || "Founding City";
+  removeOneValue(availableCityNames, firstCityName);
+
+  // Distribuzione base semplice per questo step.
+  // Alternativa possibile: tutto in agriculture.
+  const populationAssignments = {
+    army: 2,
+    agriculture: 3,
+    trade: 2,
+    labor: 2,
+    scholars: 1,
+  };
+
+  const gameLog = ["Game started"];
+  if (selectedCulture) {
+    gameLog.push(`Culture selected: ${selectedCulture.name}`);
+  }
+  if (selectedAdvance) {
+    gameLog.push(`Starting advance: ${selectedAdvance.name}`);
+  }
+  gameLog.push(`First city founded: ${firstCityName}`);
 
   return {
     turn: 1,
     maxTurns: 50,
-    culture: {
-      id: startingCulture.id,
-      name: startingCulture.name,
-    },
+    culture: selectedCulture
+      ? { id: selectedCulture.id, name: selectedCulture.name }
+      : { id: "unknown", name: "Unknown" },
+    startingAdvanceId: selectedAdvance ? selectedAdvance.id : null,
     populationTotal: 10,
-    populationAssignments: {
-      army: 2,
-      agriculture: 3,
-      trade: 2,
-      labor: 2,
-      scholars: 1,
-    },
+    populationAssignments,
     food: 0,
     gold: 0,
     cities: [
       {
         id: "city-1",
-        name: startingCityName,
+        name: firstCityName,
+        wonderId: null,
       },
     ],
+    availableCityNames,
     wonders: [],
-    advances: [...(startingCulture.startingAdvanceIds || [])],
     leaders: [],
+    advances: selectedAdvance ? [selectedAdvance.id] : [],
+    skipBuildPhase: false,
     currentProject: null,
     projectProgress: 0,
-    skipBuildPhase: false,
-    gameLog: ["Turno 1 iniziato. Fondazione della prima città."],
+    gameLog,
     gameOver: false,
   };
 }
