@@ -1,5 +1,5 @@
-import { ADVANCES } from "./gameData.js";
-import {
+const { ADVANCES } = window.GameData;
+const {
   applyPopulationChange,
   canStartCityProject,
   canStartWonderProject,
@@ -13,7 +13,7 @@ import {
   canDecreasePopulationRole,
   calculateFinalScore,
   nextTurn,
-} from "./gameLogic.js";
+} = window.GameLogic;
 
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
 
@@ -114,6 +114,14 @@ const elements = {
   finalWonderPoints: document.getElementById("final-wonder-points"),
   finalTotalScore: document.getElementById("final-total-score"),
 };
+
+const requiredElements = ["endTurnButton", "eventLogList", "turnValue"];
+requiredElements.forEach((name) => {
+  if (!elements[name]) {
+    console.error(`[ERROR] Missing required DOM element: ${name}`);
+  }
+});
+
 
 function renderList(listElement, values, emptyLabel) {
   listElement.innerHTML = "";
@@ -336,7 +344,8 @@ function renderBuildControls(state) {
   }
 }
 
-export function renderGame(state) {
+function renderGame(state) {
+  console.log("[DEBUG] renderGame", { turn: state?.turn, phase: state?.currentPhase, logEntries: state?.gameLog?.length });
   const economyPreview = getEconomyPreview(state);
 
   elements.turnValue.textContent = String(state.turn);
@@ -518,9 +527,16 @@ export function renderGame(state) {
 }
 
 
-elements.endTurnButton.addEventListener("click", () => {
-  nextTurn(gameState);
-  renderGame(gameState);
+elements.endTurnButton.addEventListener("click", (event) => {
+  event.preventDefault();
+  console.log("[DEBUG] end turn button clicked", { turn: gameState.turn, phase: gameState.currentPhase });
+
+  try {
+    nextTurn(gameState);
+    renderGame(gameState);
+  } catch (error) {
+    console.error("[ERROR] Failed to execute economic turn", error);
+  }
 });
 
 elements.projectTypeSelect.addEventListener("change", () => {
@@ -567,3 +583,5 @@ elements.surrenderIfWarCheckbox.addEventListener("change", () => {
   gameState.surrenderIfWar = elements.surrenderIfWarCheckbox.checked;
   renderGame(gameState);
 });
+
+window.renderGame = renderGame;

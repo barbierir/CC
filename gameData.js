@@ -2,7 +2,7 @@
 // In questo step includono culture, advances, leader, wonders e nomi città
 // per consentire setup iniziale realistico ed economia/produzione base.
 
-export const CULTURES = [
+const CULTURES = [
   { id: "egyptian", name: "Egyptian", startingAdvanceId: "engineering" },
   { id: "mesopotamian", name: "Mesopotamian", startingAdvanceId: "mathematics" },
   { id: "athenian", name: "Athenian", startingAdvanceId: "philosophy" },
@@ -17,7 +17,7 @@ export const CULTURES = [
   { id: "mongolian", name: "Mongolian", startingAdvanceId: "equestrian" },
 ];
 
-export const ADVANCES = [
+const ADVANCES = [
   {
     id: "pottery",
     name: "Pottery",
@@ -140,7 +140,7 @@ export const ADVANCES = [
   },
 ];
 
-export const LEADERS = [
+const LEADERS = [
   {
     id: "ruler",
     name: "Ruler",
@@ -167,7 +167,7 @@ export const LEADERS = [
   },
 ];
 
-export const WONDERS = [
+const WONDERS = [
   {
     id: "sphinx",
     name: "Sphinx",
@@ -260,7 +260,7 @@ export const WONDERS = [
   },
 ];
 
-export const DISASTERS = [
+const DISASTERS = [
   {
     rollMin: 1,
     rollMax: 1,
@@ -430,7 +430,7 @@ export const DISASTERS = [
   },
 ];
 
-export const CITY_NAMES = [
+const CITY_NAMES = [
   "Memphis",
   "Thebes",
   "Heliopolis",
@@ -462,3 +462,13 @@ export const CITY_NAMES = [
   "Pergamon",
   "Sardis",
 ];
+
+
+window.GameData = {
+  CULTURES,
+  ADVANCES,
+  LEADERS,
+  WONDERS,
+  DISASTERS,
+  CITY_NAMES,
+};

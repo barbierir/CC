@@ -1,4 +1,4 @@
-import { ADVANCES, CITY_NAMES, CULTURES, DISASTERS, LEADERS, WONDERS } from "./gameData.js";
+const { ADVANCES, CITY_NAMES, CULTURES, DISASTERS, LEADERS, WONDERS } = window.GameData;
 
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
 const POPULATION_LOSS_ORDER = ["agriculture", "trade", "labor", "scholars", "army"];
@@ -15,7 +15,7 @@ function pushSectionHeader(state, title) {
   state.gameLog.push(`===== ${title} =====`);
 }
 
-export function getRandomItem(values) {
+function getRandomItem(values) {
   if (!Array.isArray(values) || values.length === 0) {
     return null;
   }
@@ -42,27 +42,27 @@ function sumAssignments(assignments) {
   return POPULATION_ROLES.reduce((sum, role) => sum + (assignments[role] || 0), 0);
 }
 
-export function hasAdvance(state, advanceId) {
+function hasAdvance(state, advanceId) {
   return state.advances.includes(advanceId);
 }
 
-export function hasWonder(state, wonderId) {
+function hasWonder(state, wonderId) {
   return state.wonders.some((wonder) => wonder.id === wonderId);
 }
 
-export function countLeadersByType(state, leaderType) {
+function countLeadersByType(state, leaderType) {
   return state.leaders.filter((leader) => leader.id === leaderType).length;
 }
 
-export function getCityCount(state) {
+function getCityCount(state) {
   return state.cities.length;
 }
 
-export function getScholarCount(state) {
+function getScholarCount(state) {
   return state.populationAssignments.scholars || 0;
 }
 
-export function generateUniqueId(state, prefix) {
+function generateUniqueId(state, prefix) {
   const currentValue = state.idCounters[prefix] || 0;
   const nextValue = currentValue + 1;
   state.idCounters[prefix] = nextValue;
@@ -116,7 +116,7 @@ function findLeaderTemplateByTypeRoll() {
   }
 }
 
-export function rollDie(sides) {
+function rollDie(sides) {
   const numericSides = Number(sides);
   if (!Number.isInteger(numericSides) || numericSides < 2) {
     throw new Error("rollDie requires an integer >= 2");
@@ -125,11 +125,11 @@ export function rollDie(sides) {
   return Math.floor(Math.random() * numericSides) + 1;
 }
 
-export function rollTwoDice() {
+function rollTwoDice() {
   return rollDie(6) + rollDie(6);
 }
 
-export function rollMultipleDice(count, sides) {
+function rollMultipleDice(count, sides) {
   const rolls = [];
   for (let index = 0; index < count; index += 1) {
     rolls.push(rollDie(sides));
@@ -137,7 +137,7 @@ export function rollMultipleDice(count, sides) {
   return rolls;
 }
 
-export function sumDice(count, sides) {
+function sumDice(count, sides) {
   return rollMultipleDice(count, sides).reduce((sum, value) => sum + value, 0);
 }
 
@@ -244,7 +244,7 @@ function enforceStateInvariants(state) {
   syncPopulationAssignments(state);
 }
 
-export function losePopulation(state, amount, reason) {
+function losePopulation(state, amount, reason) {
   const finalLoss = Math.max(0, Math.min(Math.floor(amount), state.populationTotal));
   if (finalLoss <= 0) {
     state.gameLog.push(`Population lost: 0 (${reason})`);
@@ -282,21 +282,21 @@ function loseArmyPopulation(state, amount) {
   return loss;
 }
 
-export function loseFood(state, amount, reason) {
+function loseFood(state, amount, reason) {
   const finalLoss = Math.max(0, Math.min(Math.floor(amount), state.food));
   state.food -= finalLoss;
   state.gameLog.push(`Food lost: ${finalLoss} (${reason})`);
   return finalLoss;
 }
 
-export function loseGold(state, amount, reason) {
+function loseGold(state, amount, reason) {
   const finalLoss = Math.max(0, Math.min(Math.floor(amount), state.gold));
   state.gold -= finalLoss;
   state.gameLog.push(`Gold lost: ${finalLoss} (${reason})`);
   return finalLoss;
 }
 
-export function loseRandomCity(state, reason) {
+function loseRandomCity(state, reason) {
   if (state.cities.length === 0) {
     state.gameLog.push(`No city lost (${reason})`);
     return null;
@@ -314,7 +314,7 @@ export function loseRandomCity(state, reason) {
   return city;
 }
 
-export function loseRandomWonder(state, reason) {
+function loseRandomWonder(state, reason) {
   if (state.wonders.length === 0) {
     state.gameLog.push(`No wonder lost (${reason})`);
     return null;
@@ -347,7 +347,7 @@ function getConstructionCost(state, laborBase, goldBase) {
   return { laborRequired, goldCost };
 }
 
-export function getLaborProducedThisTurn(state) {
+function getLaborProducedThisTurn(state) {
   const laborPopulation = state.populationAssignments.labor || 0;
   const builders = countLeadersByType(state, "builder");
 
@@ -359,7 +359,7 @@ export function getLaborProducedThisTurn(state) {
   return laborPopulation + buildersLabor;
 }
 
-export function getAvailableWonderDefinitions(state) {
+function getAvailableWonderDefinitions(state) {
   return WONDERS.filter((wonder) => {
     if (!hasAdvance(state, wonder.requirementAdvanceId)) {
       return false;
@@ -369,7 +369,7 @@ export function getAvailableWonderDefinitions(state) {
   });
 }
 
-export function getUnusedCityName(state) {
+function getUnusedCityName(state) {
   if (!Array.isArray(state.availableCityNames) || state.availableCityNames.length === 0) {
     return `City ${state.cities.length + 1}`;
   }
@@ -379,7 +379,7 @@ export function getUnusedCityName(state) {
   return name;
 }
 
-export function canStartCityProject(state) {
+function canStartCityProject(state) {
   if (state.currentProject) {
     return { ok: false, reason: "Another project is already active" };
   }
@@ -392,7 +392,7 @@ export function canStartCityProject(state) {
   return { ok: true };
 }
 
-export function canStartWonderProject(state, wonderId, cityId) {
+function canStartWonderProject(state, wonderId, cityId) {
   if (state.currentProject) {
     return { ok: false, reason: "Another project is already active" };
   }
@@ -438,7 +438,7 @@ export function canStartWonderProject(state, wonderId, cityId) {
   return { ok: true };
 }
 
-export function createCityProject(state) {
+function createCityProject(state) {
   const startCheck = canStartCityProject(state);
   if (!startCheck.ok) {
     state.gameLog.push(startCheck.reason);
@@ -466,7 +466,7 @@ export function createCityProject(state) {
   return { ok: true, project };
 }
 
-export function createWonderProject(state, wonderId, cityId) {
+function createWonderProject(state, wonderId, cityId) {
   const startCheck = canStartWonderProject(state, wonderId, cityId);
   if (!startCheck.ok) {
     state.gameLog.push(startCheck.reason);
@@ -545,7 +545,7 @@ function completeWonderProject(state, project) {
   pushLog(state, `Project completed: ${project.name}`);
 }
 
-export function resolveBuildPhase(state) {
+function resolveBuildPhase(state) {
   const producedLabor = getLaborProducedThisTurn(state);
   state.gameLog.push(`Build produced ${producedLabor} labor`);
 
@@ -576,7 +576,7 @@ export function resolveBuildPhase(state) {
   state.currentProject = null;
 }
 
-export function createInitialGameState() {
+function createInitialGameState() {
   const selectedCulture = getRandomItem(CULTURES);
   const availableCityNames = [...CITY_NAMES];
 
@@ -750,7 +750,7 @@ function createSpecialWarFromDisaster(state, disasterId, mitigationApplied) {
   };
 }
 
-export function resolveDisasterCheck(state) {
+function resolveDisasterCheck(state) {
   state.skipBuildPhase = false;
   state.pendingWar = null;
   state.lastDisaster = null;
@@ -1102,7 +1102,7 @@ function runTradePhase(state) {
   );
 }
 
-export function getResearchBonusFromAdvances(state) {
+function getResearchBonusFromAdvances(state) {
   let bonus = 0;
 
   if (hasAdvance(state, "astronomy")) {
@@ -1124,7 +1124,7 @@ function getResearchBonusFromWonders(state) {
   return hasWonder(state, "great-library") ? 1 : 0;
 }
 
-export function getTotalResearchRolls(state) {
+function getTotalResearchRolls(state) {
   const scholars = getScholarCount(state);
   const thinkers = countLeadersByType(state, "thinker");
   const advancesBonus = getResearchBonusFromAdvances(state);
@@ -1133,7 +1133,7 @@ export function getTotalResearchRolls(state) {
   return scholars + thinkers + advancesBonus + wonderBonus;
 }
 
-export function getResearchRollBreakdown(state) {
+function getResearchRollBreakdown(state) {
   return {
     scholars: getScholarCount(state),
     thinkers: countLeadersByType(state, "thinker"),
@@ -1145,12 +1145,12 @@ export function getResearchRollBreakdown(state) {
   };
 }
 
-export function getRandomAvailableAdvance(state) {
+function getRandomAvailableAdvance(state) {
   const availableAdvances = ADVANCES.filter((advance) => !hasAdvance(state, advance.id));
   return getRandomItem(availableAdvances) || null;
 }
 
-export function resolveResearchPhase(state) {
+function resolveResearchPhase(state) {
   const totalRolls = getTotalResearchRolls(state);
   state.gameLog.push(`Research phase: ${totalRolls} rolls`);
 
@@ -1198,7 +1198,7 @@ function getAdvanceScore(state) {
   }, 0);
 }
 
-export function calculateFinalScore(state) {
+function calculateFinalScore(state) {
   const advancePoints = getAdvanceScore(state);
   const cityPoints = getCityCount(state) * 5;
   const wonderPoints = state.completedWonders.length * 15;
@@ -1211,7 +1211,7 @@ export function calculateFinalScore(state) {
   };
 }
 
-export function canIncreasePopulationRole(state, role) {
+function canIncreasePopulationRole(state, role) {
   if (!POPULATION_ROLES.includes(role)) {
     return { ok: false, reason: "Invalid population role" };
   }
@@ -1236,7 +1236,7 @@ export function canIncreasePopulationRole(state, role) {
   return { ok: true };
 }
 
-export function canDecreasePopulationRole(state, role) {
+function canDecreasePopulationRole(state, role) {
   if (!POPULATION_ROLES.includes(role)) {
     return { ok: false, reason: "Invalid population role" };
   }
@@ -1257,7 +1257,7 @@ export function canDecreasePopulationRole(state, role) {
   return { ok: true };
 }
 
-export function applyPopulationChange(state, role, delta) {
+function applyPopulationChange(state, role, delta) {
   if (state.currentPhase !== "distribution") {
     return { ok: false, reason: "Distribution phase is not active" };
   }
@@ -1301,7 +1301,8 @@ export function applyPopulationChange(state, role, delta) {
   return { ok: false, reason: "Delta must be +1 or -1" };
 }
 
-export function nextTurn(state) {
+function nextTurn(state) {
+  console.log("[DEBUG] nextTurn started", { turn: state?.turn, phase: state?.currentPhase, gameOver: state?.gameOver });
   if (state.gameOver) {
     state.gameLog.push("La partita è terminata. Nessun altro turno disponibile.");
     return state;
@@ -1367,7 +1368,7 @@ export function nextTurn(state) {
   return state;
 }
 
-export function getEconomyPreview(state) {
+function getEconomyPreview(state) {
   const foodPerUnit = getFoodPerAgricultureUnit(state);
   const tradePreview = getTradeIncomePreview(state);
 
@@ -1399,3 +1400,44 @@ export function getEconomyPreview(state) {
     },
   };
 }
+
+
+window.GameLogic = {
+  getRandomItem,
+  hasAdvance,
+  hasWonder,
+  countLeadersByType,
+  getCityCount,
+  getScholarCount,
+  generateUniqueId,
+  rollDie,
+  rollTwoDice,
+  rollMultipleDice,
+  sumDice,
+  losePopulation,
+  loseFood,
+  loseGold,
+  loseRandomCity,
+  loseRandomWonder,
+  getLaborProducedThisTurn,
+  getAvailableWonderDefinitions,
+  getUnusedCityName,
+  canStartCityProject,
+  canStartWonderProject,
+  createCityProject,
+  createWonderProject,
+  resolveBuildPhase,
+  createInitialGameState,
+  resolveDisasterCheck,
+  getResearchBonusFromAdvances,
+  getTotalResearchRolls,
+  getResearchRollBreakdown,
+  getRandomAvailableAdvance,
+  resolveResearchPhase,
+  calculateFinalScore,
+  canIncreasePopulationRole,
+  canDecreasePopulationRole,
+  applyPopulationChange,
+  nextTurn,
+  getEconomyPreview,
+};
