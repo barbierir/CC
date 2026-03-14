@@ -11,6 +11,7 @@ import {
   getResearchRollBreakdown,
   canIncreasePopulationRole,
   canDecreasePopulationRole,
+  calculateFinalScore,
   nextTurn,
 } from "./gameLogic.js";
 
@@ -28,7 +29,17 @@ const elements = {
   projectValue: document.getElementById("project-value"),
   lastDisasterValue: document.getElementById("last-disaster-value"),
   lastWarValue: document.getElementById("last-war-value"),
+  warTypeValue: document.getElementById("war-type-value"),
+  warEnemyValue: document.getElementById("war-enemy-value"),
+  warResultValue: document.getElementById("war-result-value"),
+  disasterLastValue: document.getElementById("disaster-last-value"),
   buildSkippedValue: document.getElementById("build-skipped-value"),
+  summaryCulture: document.getElementById("summary-culture"),
+  summaryTurn: document.getElementById("summary-turn"),
+  summaryPopulation: document.getElementById("summary-population"),
+  summaryCities: document.getElementById("summary-cities"),
+  summaryWonders: document.getElementById("summary-wonders"),
+  summaryAdvances: document.getElementById("summary-advances"),
   foodValue: document.getElementById("food-value"),
   goldValue: document.getElementById("gold-value"),
   populationTotalResourceValue: document.getElementById("population-total-resource-value"),
@@ -48,6 +59,8 @@ const elements = {
   researchLiteracyPreview: document.getElementById("research-literacy-preview"),
   researchMathematicsPreview: document.getElementById("research-mathematics-preview"),
   researchGreatLibraryPreview: document.getElementById("research-great-library-preview"),
+  researchAdvancesTotalPreview: document.getElementById("research-advances-total-preview"),
+  researchWondersTotalPreview: document.getElementById("research-wonders-total-preview"),
   researchTotalPreview: document.getElementById("research-total-preview"),
   populationTotalValue: document.getElementById("population-total-value"),
   populationAssignmentsList: document.getElementById("population-assignments-list"),
@@ -70,6 +83,11 @@ const elements = {
   buildStatusMessage: document.getElementById("build-status-message"),
   activeProjectBox: document.getElementById("active-project-box"),
   surrenderIfWarCheckbox: document.getElementById("surrender-if-war-checkbox"),
+  finalScorePanel: document.getElementById("final-score-panel"),
+  finalAdvancePoints: document.getElementById("final-advance-points"),
+  finalCityPoints: document.getElementById("final-city-points"),
+  finalWonderPoints: document.getElementById("final-wonder-points"),
+  finalTotalScore: document.getElementById("final-total-score"),
 };
 
 function renderList(listElement, values, emptyLabel) {
@@ -285,7 +303,7 @@ function renderBuildControls(state) {
       Città: ${cityLabel}
     `;
   } else {
-    elements.activeProjectBox.innerHTML = "<strong>Progetto attivo</strong><br />Nessuno";
+    elements.activeProjectBox.innerHTML = "<strong>Progetto attivo</strong><br />No active project";
   }
 }
 
@@ -308,6 +326,21 @@ export function renderGame(state) {
     ? `${state.lastWarSummary.name} — enemy ${state.lastWarSummary.enemyArmies}, seg ${state.lastWarSummary.maxSegments}, ${state.lastWarSummary.result}`
     : "Nessuna";
   elements.buildSkippedValue.textContent = state.skipBuildPhase ? "Sì" : "No";
+
+  elements.summaryCulture.textContent = state.culture.name;
+  elements.summaryTurn.textContent = `${state.turn}/${state.maxTurns}`;
+  elements.summaryPopulation.textContent = String(state.populationTotal);
+  elements.summaryCities.textContent = String(state.cities.length);
+  elements.summaryWonders.textContent = String(state.wonders.length);
+  elements.summaryAdvances.textContent = String(state.advances.length);
+
+  elements.disasterLastValue.textContent = state.lastDisaster
+    ? `${state.lastDisaster.name} (d20: ${state.lastDisaster.roll})`
+    : "Nessuno";
+
+  elements.warTypeValue.textContent = state.lastWarSummary ? state.lastWarSummary.name : "Nessuna";
+  elements.warEnemyValue.textContent = state.lastWarSummary ? String(state.lastWarSummary.enemyArmies) : "-";
+  elements.warResultValue.textContent = state.lastWarSummary ? state.lastWarSummary.result : "-";
 
   elements.foodValue.textContent = String(state.food);
   elements.goldValue.textContent = String(state.gold);
@@ -334,6 +367,8 @@ export function renderGame(state) {
   elements.researchLiteracyPreview.textContent = String(researchBreakdown.literacyBonus);
   elements.researchMathematicsPreview.textContent = String(researchBreakdown.mathematicsBonus);
   elements.researchGreatLibraryPreview.textContent = String(researchBreakdown.greatLibraryBonus);
+  elements.researchAdvancesTotalPreview.textContent = String(researchBreakdown.astronomyBonus + researchBreakdown.literacyBonus + researchBreakdown.mathematicsBonus);
+  elements.researchWondersTotalPreview.textContent = String(researchBreakdown.greatLibraryBonus);
   elements.researchTotalPreview.textContent = String(researchBreakdown.totalRolls);
 
   elements.populationTotalValue.textContent = String(state.populationTotal);
@@ -356,7 +391,7 @@ export function renderGame(state) {
       const cityName = state.cities.find((city) => city.id === wonder.cityId)?.name || "Unknown";
       return `${wonder.name} in ${cityName}`;
     }),
-    "Nessun wonder"
+    "No wonders yet"
   );
 
 
@@ -373,6 +408,9 @@ export function renderGame(state) {
       if (!advance) {
         item.textContent = advanceId;
       } else {
+        if (state.lastUnlockedAdvance === advance.name) {
+          item.classList.add("highlight-discovery");
+        }
         item.innerHTML = `<strong>${advance.name}</strong><br /><span class="muted-line">${advance.description}</span><br /><span class="muted-line">VP: ${advance.victoryPoints}</span>`;
       }
       elements.advancesList.appendChild(item);
@@ -380,21 +418,59 @@ export function renderGame(state) {
   }
   renderLeaders(state);
 
-  renderList(elements.eventLogList, [...state.gameLog].reverse(), "Nessun evento");
+  elements.eventLogList.innerHTML = "";
+  const logValues = [...state.gameLog].reverse();
+  if (logValues.length === 0) {
+    const li = document.createElement("li");
+    li.textContent = "Nessun evento";
+    elements.eventLogList.appendChild(li);
+  } else {
+    logValues.forEach((entry) => {
+      const li = document.createElement("li");
+      li.textContent = entry;
+      if (entry.startsWith("Turn ") || entry.startsWith("----------------")) {
+        li.classList.add("log-separator");
+      }
+      if (entry.startsWith("Warning:")) {
+        li.classList.add("log-warning");
+      }
+      elements.eventLogList.appendChild(li);
+    });
+  }
 
   if (state.currentPhase === "distribution") {
-    elements.endTurnButton.textContent = "Conferma distribuzione e completa turno";
+    elements.endTurnButton.textContent = "Concludi turno";
     elements.turnHelpText.textContent =
 "Distribuisci popolazione, poi conferma per Gain Leader + Harvest + Disaster Check + Upkeep + Leader Aging + War + Trade + Build + Research.";
   } else {
-    elements.endTurnButton.textContent = "Avvia turno economico";
+    elements.endTurnButton.textContent = "Concludi turno";
     elements.turnHelpText.textContent = "Esegue Population Increase e apre la Distribution.";
+  }
+
+
+  if (state.gameOver) {
+    const score = state.finalScore || calculateFinalScore(state);
+    elements.finalScorePanel.hidden = false;
+    elements.finalAdvancePoints.textContent = String(score.advancePoints);
+    elements.finalCityPoints.textContent = String(score.cityPoints);
+    elements.finalWonderPoints.textContent = String(score.wonderPoints);
+    elements.finalTotalScore.textContent = String(score.total);
+    elements.endTurnButton.textContent = "Partita conclusa";
+  } else {
+    elements.finalScorePanel.hidden = true;
   }
 
   elements.endTurnButton.disabled = state.gameOver;
   elements.surrenderIfWarCheckbox.checked = Boolean(state.surrenderIfWar);
   renderBuildControls(state);
+
+  if (state.lastCompletedProject) {
+    elements.activeProjectBox.classList.add("highlight-complete");
+  } else {
+    elements.activeProjectBox.classList.remove("highlight-complete");
+  }
 }
+
 
 elements.endTurnButton.addEventListener("click", () => {
   nextTurn(gameState);

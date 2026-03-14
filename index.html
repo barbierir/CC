@@ -9,7 +9,7 @@
   <body>
     <header class="page-header">
       <h1>Civilization Browser Game</h1>
-      <p class="subtitle">Setup iniziale, economia base e loop turni (v1)</p>
+      <p class="subtitle">Versione completa: scoring finale, effetti completi e UI migliorata</p>
     </header>
 
     <main class="dashboard">
@@ -26,8 +26,18 @@
         <p><strong>Build saltata:</strong> <span id="build-skipped-value">No</span></p>
       </section>
 
+      <section class="card" aria-labelledby="civ-summary-title">
+        <h2 id="civ-summary-title">Civilization Summary</h2>
+        <p><strong>Cultura:</strong> <span id="summary-culture">-</span></p>
+        <p><strong>Turno:</strong> <span id="summary-turn">-</span></p>
+        <p><strong>Popolazione:</strong> <span id="summary-population">-</span></p>
+        <p><strong>Città:</strong> <span id="summary-cities">-</span></p>
+        <p><strong>Wonders:</strong> <span id="summary-wonders">-</span></p>
+        <p><strong>Advances:</strong> <span id="summary-advances">-</span></p>
+      </section>
+
       <section class="card" aria-labelledby="resources-title">
-        <h2 id="resources-title">Risorse</h2>
+        <h2 id="resources-title">Economia</h2>
         <p><strong>Cibo:</strong> <span id="food-value">0</span></p>
         <p><strong>Oro:</strong> <span id="gold-value">0</span></p>
         <p><strong>Popolazione totale:</strong> <span id="population-total-resource-value">0</span></p>
@@ -48,6 +58,19 @@
         </p>
       </section>
 
+
+      <section class="card" aria-labelledby="war-panel-title">
+        <h2 id="war-panel-title">War</h2>
+        <p><strong>Tipo:</strong> <span id="war-type-value">-</span></p>
+        <p><strong>Enemy armies:</strong> <span id="war-enemy-value">-</span></p>
+        <p><strong>Risultato:</strong> <span id="war-result-value">-</span></p>
+      </section>
+
+      <section class="card" aria-labelledby="disaster-panel-title">
+        <h2 id="disaster-panel-title">Disaster</h2>
+        <p><strong>Ultimo disaster:</strong> <span id="disaster-last-value">Nessuno</span></p>
+      </section>
+
       <section class="card" aria-labelledby="population-title">
         <h2 id="population-title">Popolazione</h2>
         <p><strong>Totale:</strong> <span id="population-total-value">0</span></p>
@@ -62,14 +85,16 @@
 
 
       <section class="card" aria-labelledby="research-preview-title">
-        <h2 id="research-preview-title">Research Preview</h2>
+        <h2 id="research-preview-title">Ricerca</h2>
         <p><strong>Scholars:</strong> <span id="research-scholars-preview">0</span></p>
         <p><strong>Thinkers:</strong> <span id="research-thinkers-preview">0</span></p>
         <p><strong>Bonus Astronomy:</strong> <span id="research-astronomy-preview">0</span></p>
         <p><strong>Bonus Literacy:</strong> <span id="research-literacy-preview">0</span></p>
         <p><strong>Bonus Mathematics:</strong> <span id="research-mathematics-preview">0</span></p>
         <p><strong>Bonus Great Library:</strong> <span id="research-great-library-preview">0</span></p>
-        <p><strong>Total research rolls:</strong> <span id="research-total-preview">0</span></p>
+        <p><strong>Bonus advances:</strong> <span id="research-advances-total-preview">0</span></p>
+        <p><strong>Bonus wonders:</strong> <span id="research-wonders-total-preview">0</span></p>
+        <p><strong>Research rolls previsti:</strong> <span id="research-total-preview">0</span></p>
       </section>
 
       <section class="card" aria-labelledby="build-projects-title">
@@ -95,7 +120,7 @@
 
           <p id="build-status-message" class="muted-line"></p>
 
-          <div id="active-project-box" class="active-project-box"></div>
+          <div id="active-project-box" class="active-project-box"><strong>Progetto attivo</strong><br />No active project</div>
         </div>
       </section>
 
@@ -103,7 +128,7 @@
         <h2 id="cities-wonders-title">Città e Wonders</h2>
         <p><strong>Numero città:</strong> <span id="city-count-value">0</span></p>
         <ul id="cities-list" class="compact-list"></ul>
-        <h3>Wonders</h3>
+        <h3>Wonders <span class="muted-line">(No wonders yet se vuoto)</span></h3>
         <ul id="wonders-list" class="compact-list"></ul>
       </section>
 
@@ -122,6 +147,15 @@
           <input id="surrender-if-war-checkbox" type="checkbox" /> Surrender if war occurs
         </label>
         <button id="end-turn-button" type="button">Avvia turno economico</button>
+      </section>
+
+
+      <section class="card full-width final-score-panel" id="final-score-panel" aria-labelledby="final-score-title" hidden>
+        <h2 id="final-score-title">Final Score</h2>
+        <p><strong>Advance points:</strong> <span id="final-advance-points">0</span></p>
+        <p><strong>City points:</strong> <span id="final-city-points">0</span></p>
+        <p><strong>Wonder points:</strong> <span id="final-wonder-points">0</span></p>
+        <p><strong>Total score:</strong> <span id="final-total-score">0</span></p>
       </section>
 
       <section class="card full-width" aria-labelledby="event-log-title">
