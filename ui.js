@@ -8,6 +8,9 @@ import {
   createWonderProject,
   getAvailableWonderDefinitions,
   getEconomyPreview,
+  getResearchRollBreakdown,
+  canIncreasePopulationRole,
+  canDecreasePopulationRole,
   nextTurn,
 } from "./gameLogic.js";
 
@@ -36,6 +39,13 @@ const elements = {
   tradeNavigationPreview: document.getElementById("trade-navigation-preview"),
   tradeRulersPreview: document.getElementById("trade-rulers-preview"),
   tradeTotalPreview: document.getElementById("trade-total-preview"),
+  researchScholarsPreview: document.getElementById("research-scholars-preview"),
+  researchThinkersPreview: document.getElementById("research-thinkers-preview"),
+  researchAstronomyPreview: document.getElementById("research-astronomy-preview"),
+  researchLiteracyPreview: document.getElementById("research-literacy-preview"),
+  researchMathematicsPreview: document.getElementById("research-mathematics-preview"),
+  researchGreatLibraryPreview: document.getElementById("research-great-library-preview"),
+  researchTotalPreview: document.getElementById("research-total-preview"),
   populationTotalValue: document.getElementById("population-total-value"),
   populationAssignmentsList: document.getElementById("population-assignments-list"),
   populationDistributionControls: document.getElementById("population-distribution-controls"),
@@ -120,18 +130,24 @@ function formatProjectSummary(project) {
   return `${project.name} (${project.laborProgress}/${project.laborRequired})`;
 }
 
-function createDistributionRow(role, amount, isActiveDistribution) {
+function createDistributionRow(role, amount, isActiveDistribution, state) {
   const row = document.createElement("div");
   row.className = "distribution-row";
 
   const label = document.createElement("span");
   label.className = "distribution-label";
-  label.textContent = role;
+
+  if (role === "scholars") {
+    label.textContent = `scholars: ${amount} / ${state.cities.length} max`;
+  } else {
+    label.textContent = role;
+  }
 
   const minusButton = document.createElement("button");
   minusButton.type = "button";
   minusButton.textContent = "-";
-  minusButton.disabled = !isActiveDistribution;
+  const canDecrease = canDecreasePopulationRole(state, role);
+  minusButton.disabled = !isActiveDistribution || !canDecrease.ok;
   minusButton.addEventListener("click", () => {
     const result = applyPopulationChange(gameState, role, -1);
     if (!result.ok) {
@@ -147,7 +163,8 @@ function createDistributionRow(role, amount, isActiveDistribution) {
   const plusButton = document.createElement("button");
   plusButton.type = "button";
   plusButton.textContent = "+";
-  plusButton.disabled = !isActiveDistribution;
+  const canIncrease = canIncreasePopulationRole(state, role);
+  plusButton.disabled = !isActiveDistribution || !canIncrease.ok;
   plusButton.addEventListener("click", () => {
     const result = applyPopulationChange(gameState, role, 1);
     if (!result.ok) {
@@ -167,13 +184,13 @@ function renderDistributionControls(state) {
 
   POPULATION_ROLES.forEach((role) => {
     const amount = state.populationAssignments[role] || 0;
-    const row = createDistributionRow(role, amount, isActiveDistribution);
+    const row = createDistributionRow(role, amount, isActiveDistribution, state);
     elements.populationDistributionControls.appendChild(row);
   });
 
   if (isActiveDistribution) {
     elements.distributionStatus.textContent =
-      "Redistribuisci la popolazione (variazione max ±6 per categoria dal turno iniziale).";
+      `Redistribuisci la popolazione (max ±6 per categoria). Scholars limit: ${state.populationAssignments.scholars}/${state.cities.length}.`;
   } else {
     elements.distributionStatus.textContent = "Attiva solo durante la fase Distribution.";
   }
@@ -299,6 +316,15 @@ export function renderGame(state) {
   );
   elements.tradeTotalPreview.textContent = formatTradeTotalRange(economyPreview.tradeGoldRange);
 
+  const researchBreakdown = getResearchRollBreakdown(state);
+  elements.researchScholarsPreview.textContent = String(researchBreakdown.scholars);
+  elements.researchThinkersPreview.textContent = String(researchBreakdown.thinkers);
+  elements.researchAstronomyPreview.textContent = String(researchBreakdown.astronomyBonus);
+  elements.researchLiteracyPreview.textContent = String(researchBreakdown.literacyBonus);
+  elements.researchMathematicsPreview.textContent = String(researchBreakdown.mathematicsBonus);
+  elements.researchGreatLibraryPreview.textContent = String(researchBreakdown.greatLibraryBonus);
+  elements.researchTotalPreview.textContent = String(researchBreakdown.totalRolls);
+
   elements.populationTotalValue.textContent = String(state.populationTotal);
   const assignments = Object.entries(state.populationAssignments).map(
     ([role, amount]) => `${role}: ${amount}`
@@ -322,11 +348,25 @@ export function renderGame(state) {
     "Nessun wonder"
   );
 
-  renderList(
-    elements.advancesList,
-    state.advances.map((advanceId) => getAdvanceNameById(advanceId)),
-    "Nessun advance"
-  );
+
+  elements.advancesList.innerHTML = "";
+  if (state.advances.length === 0) {
+    const emptyItem = document.createElement("li");
+    emptyItem.textContent = "Nessun advance";
+    elements.advancesList.appendChild(emptyItem);
+  } else {
+    state.advances.forEach((advanceId) => {
+      const advance = ADVANCES.find((item) => item.id === advanceId);
+      const item = document.createElement("li");
+      item.className = "advance-item";
+      if (!advance) {
+        item.textContent = advanceId;
+      } else {
+        item.innerHTML = `<strong>${advance.name}</strong><br /><span class="muted-line">${advance.description}</span><br /><span class="muted-line">VP: ${advance.victoryPoints}</span>`;
+      }
+      elements.advancesList.appendChild(item);
+    });
+  }
   renderLeaders(state);
 
   renderList(elements.eventLogList, [...state.gameLog].reverse(), "Nessun evento");
@@ -334,7 +374,7 @@ export function renderGame(state) {
   if (state.currentPhase === "distribution") {
     elements.endTurnButton.textContent = "Conferma distribuzione e completa turno";
     elements.turnHelpText.textContent =
-      "Distribuisci popolazione, poi conferma per Gain Leader + Harvest + Upkeep + Leader Aging + Trade + Build.";
+      "Distribuisci popolazione, poi conferma per Gain Leader + Harvest + Upkeep + Leader Aging + Trade + Build + Research.";
   } else {
     elements.endTurnButton.textContent = "Avvia turno economico";
     elements.turnHelpText.textContent = "Esegue Population Increase e apre la Distribution.";

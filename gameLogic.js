@@ -34,12 +34,20 @@ export function hasAdvance(state, advanceId) {
   return state.advances.includes(advanceId);
 }
 
+export function hasWonder(state, wonderId) {
+  return state.wonders.some((wonder) => wonder.id === wonderId);
+}
+
 export function countLeadersByType(state, leaderType) {
   return state.leaders.filter((leader) => leader.id === leaderType).length;
 }
 
 export function getCityCount(state) {
   return state.cities.length;
+}
+
+export function getScholarCount(state) {
+  return state.populationAssignments.scholars || 0;
 }
 
 export function generateUniqueId(state, prefix) {
@@ -103,6 +111,10 @@ export function rollDie(sides) {
   }
 
   return Math.floor(Math.random() * numericSides) + 1;
+}
+
+export function rollTwoDice() {
+  return rollDie(6) + rollDie(6);
 }
 
 function getConstructionCost(state, laborBase, goldBase) {
@@ -513,6 +525,78 @@ function runTradePhase(state) {
   );
 }
 
+
+export function getResearchBonusFromAdvances(state) {
+  let bonus = 0;
+
+  if (hasAdvance(state, "astronomy")) {
+    bonus += 1;
+  }
+
+  if (hasAdvance(state, "literacy")) {
+    bonus += 1;
+  }
+
+  if (hasAdvance(state, "mathematics")) {
+    bonus += 1;
+  }
+
+  return bonus;
+}
+
+function getResearchBonusFromWonders(state) {
+  return hasWonder(state, "great-library") ? 1 : 0;
+}
+
+export function getTotalResearchRolls(state) {
+  const scholars = getScholarCount(state);
+  const thinkers = countLeadersByType(state, "thinker");
+  const advancesBonus = getResearchBonusFromAdvances(state);
+  const wonderBonus = getResearchBonusFromWonders(state);
+
+  return scholars + thinkers + advancesBonus + wonderBonus;
+}
+
+export function getResearchRollBreakdown(state) {
+  return {
+    scholars: getScholarCount(state),
+    thinkers: countLeadersByType(state, "thinker"),
+    astronomyBonus: hasAdvance(state, "astronomy") ? 1 : 0,
+    literacyBonus: hasAdvance(state, "literacy") ? 1 : 0,
+    mathematicsBonus: hasAdvance(state, "mathematics") ? 1 : 0,
+    greatLibraryBonus: getResearchBonusFromWonders(state),
+    totalRolls: getTotalResearchRolls(state),
+  };
+}
+
+export function getRandomAvailableAdvance(state) {
+  const availableAdvances = ADVANCES.filter((advance) => !hasAdvance(state, advance.id));
+  return pickRandomItem(availableAdvances) || null;
+}
+
+export function resolveResearchPhase(state) {
+  const totalRolls = getTotalResearchRolls(state);
+  state.gameLog.push(`Research phase: ${totalRolls} rolls`);
+
+  for (let rollIndex = 1; rollIndex <= totalRolls; rollIndex += 1) {
+    const result = rollTwoDice();
+    state.gameLog.push(`Research roll ${rollIndex}: ${result}`);
+
+    if (result !== 2 && result !== 12) {
+      continue;
+    }
+
+    const unlockedAdvance = getRandomAvailableAdvance(state);
+    if (!unlockedAdvance) {
+      state.gameLog.push("Research succeeded but no advances remained");
+      continue;
+    }
+
+    state.advances.push(unlockedAdvance.id);
+    state.gameLog.push(`Research breakthrough: ${unlockedAdvance.name}`);
+  }
+}
+
 function getTradeIncomePreview(state) {
   const cityCount = getCityCount(state);
 
@@ -525,6 +609,53 @@ function getTradeIncomePreview(state) {
   };
 }
 
+
+export function canIncreasePopulationRole(state, role) {
+  if (!POPULATION_ROLES.includes(role)) {
+    return { ok: false, reason: "Invalid population role" };
+  }
+
+  if (!canRoleIncreaseWithinLimit(state, role)) {
+    return { ok: false, reason: "Role cannot increase more than +6 from turn start" };
+  }
+
+  if (role === "army" && state.gold <= 0) {
+    return { ok: false, reason: "Not enough gold to assign more Army" };
+  }
+
+  if (role === "scholars" && getScholarCount(state) >= getCityCount(state)) {
+    return { ok: false, reason: `Scholar limit reached (${getCityCount(state)} max)` };
+  }
+
+  const donorRole = findRoleForDecrease(state, [role]);
+  if (!donorRole) {
+    return { ok: false, reason: "No population available to move" };
+  }
+
+  return { ok: true };
+}
+
+export function canDecreasePopulationRole(state, role) {
+  if (!POPULATION_ROLES.includes(role)) {
+    return { ok: false, reason: "Invalid population role" };
+  }
+
+  if (state.populationAssignments[role] <= 0) {
+    return { ok: false, reason: "Role already at 0" };
+  }
+
+  if (!canRoleDecreaseWithinLimit(state, role)) {
+    return { ok: false, reason: "Role cannot decrease more than -6 from turn start" };
+  }
+
+  const receiverRole = findRoleForIncrease(state, [role]);
+  if (!receiverRole) {
+    return { ok: false, reason: "No role can receive additional population" };
+  }
+
+  return { ok: true };
+}
+
 export function applyPopulationChange(state, role, delta) {
   if (state.currentPhase !== "distribution") {
     return { ok: false, reason: "Distribution phase is not active" };
@@ -535,18 +666,12 @@ export function applyPopulationChange(state, role, delta) {
   }
 
   if (delta === 1) {
-    if (!canRoleIncreaseWithinLimit(state, role)) {
-      return { ok: false, reason: "Role cannot increase more than +6 from turn start" };
-    }
-
-    if (role === "army" && state.gold <= 0) {
-      return { ok: false, reason: "Not enough gold to assign more Army" };
+    const canIncrease = canIncreasePopulationRole(state, role);
+    if (!canIncrease.ok) {
+      return canIncrease;
     }
 
     const donorRole = findRoleForDecrease(state, [role]);
-    if (!donorRole) {
-      return { ok: false, reason: "No population available to move" };
-    }
 
     state.populationAssignments[donorRole] -= 1;
     state.populationAssignments[role] += 1;
@@ -559,18 +684,12 @@ export function applyPopulationChange(state, role, delta) {
   }
 
   if (delta === -1) {
-    if (state.populationAssignments[role] <= 0) {
-      return { ok: false, reason: "Role already at 0" };
-    }
-
-    if (!canRoleDecreaseWithinLimit(state, role)) {
-      return { ok: false, reason: "Role cannot decrease more than -6 from turn start" };
+    const canDecrease = canDecreasePopulationRole(state, role);
+    if (!canDecrease.ok) {
+      return canDecrease;
     }
 
     const receiverRole = findRoleForIncrease(state, [role]);
-    if (!receiverRole) {
-      return { ok: false, reason: "No role can receive additional population" };
-    }
 
     state.populationAssignments[role] -= 1;
     state.populationAssignments[receiverRole] += 1;
@@ -603,12 +722,14 @@ export function nextTurn(state) {
     // 6) Leader aging
     // 7) Trade
     // 8) Build
+    // 9) Research
     runGainLeaderPhase(state);
     runHarvestPhase(state);
     runUpkeepPhase(state);
     runLeaderAgingPhase(state);
     runTradePhase(state);
     resolveBuildPhase(state);
+    resolveResearchPhase(state);
 
     state.turn += 1;
     state.currentPhase = "ready";
