@@ -1,3 +1,4 @@
+import { ADVANCES } from "./gameData.js";
 import { createInitialGameState, nextTurn } from "./gameLogic.js";
 
 const gameState = createInitialGameState();
@@ -6,6 +7,7 @@ const elements = {
   turnValue: document.getElementById("turn-value"),
   maxTurnsValue: document.getElementById("max-turns-value"),
   cultureValue: document.getElementById("culture-value"),
+  startingAdvanceValue: document.getElementById("starting-advance-value"),
   gameOverValue: document.getElementById("game-over-value"),
   projectValue: document.getElementById("project-value"),
   foodValue: document.getElementById("food-value"),
@@ -38,10 +40,18 @@ function renderList(listElement, values, emptyLabel) {
   });
 }
 
+function getAdvanceNameById(advanceId) {
+  const advance = ADVANCES.find((item) => item.id === advanceId);
+  return advance ? advance.name : advanceId;
+}
+
 export function renderGame(state) {
   elements.turnValue.textContent = String(state.turn);
   elements.maxTurnsValue.textContent = String(state.maxTurns);
   elements.cultureValue.textContent = state.culture.name;
+  elements.startingAdvanceValue.textContent = state.startingAdvanceId
+    ? getAdvanceNameById(state.startingAdvanceId)
+    : "Nessuno";
   elements.gameOverValue.textContent = state.gameOver ? "Sì" : "No";
   elements.projectValue.textContent = state.currentProject || "Nessuno";
 
@@ -62,7 +72,11 @@ export function renderGame(state) {
   );
 
   renderList(elements.wondersList, state.wonders, "Nessun wonder");
-  renderList(elements.advancesList, state.advances, "Nessun advance");
+  renderList(
+    elements.advancesList,
+    state.advances.map((advanceId) => getAdvanceNameById(advanceId)),
+    "Nessun advance"
+  );
   renderList(elements.leadersList, state.leaders, "Nessun leader");
 
   // Log in ordine inverso: eventi più recenti in alto.
