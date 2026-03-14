@@ -87,6 +87,47 @@ body {
   padding: 0.8rem 1rem;
 }
 
+.distribution-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.distribution-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.distribution-row button {
+  min-width: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.25rem 0.4rem;
+  background: #f4f7fc;
+  cursor: pointer;
+}
+
+.distribution-row button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.distribution-label {
+  text-transform: capitalize;
+}
+
+.distribution-amount {
+  min-width: 1.5rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+.muted-line {
+  color: var(--muted);
+}
+
 #end-turn-button {
   margin-top: 0.75rem;
   border: 1px solid var(--accent);

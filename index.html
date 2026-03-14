@@ -19,6 +19,7 @@
         <p><strong>Turni massimi:</strong> <span id="max-turns-value">-</span></p>
         <p><strong>Cultura iniziale:</strong> <span id="culture-value">-</span></p>
         <p><strong>Advance iniziale:</strong> <span id="starting-advance-value">-</span></p>
+        <p><strong>Fase:</strong> <span id="phase-value">-</span></p>
         <p><strong>Game Over:</strong> <span id="game-over-value">No</span></p>
         <p><strong>Progetto corrente:</strong> <span id="project-value">Nessuno</span></p>
       </section>
@@ -27,12 +28,22 @@
         <h2 id="resources-title">Risorse</h2>
         <p><strong>Cibo:</strong> <span id="food-value">0</span></p>
         <p><strong>Oro:</strong> <span id="gold-value">0</span></p>
+        <hr />
+        <p><strong>Produzione cibo prevista:</strong> <span id="food-production-preview">0</span></p>
+        <p><strong>Consumo cibo previsto:</strong> <span id="food-upkeep-preview">0</span></p>
+        <p><strong>Consumo oro army previsto:</strong> <span id="gold-upkeep-preview">0</span></p>
       </section>
 
       <section class="card" aria-labelledby="population-title">
         <h2 id="population-title">Popolazione</h2>
         <p><strong>Totale:</strong> <span id="population-total-value">0</span></p>
         <ul id="population-assignments-list" class="compact-list"></ul>
+      </section>
+
+      <section class="card" aria-labelledby="distribution-title">
+        <h2 id="distribution-title">Population Distribution</h2>
+        <p id="distribution-status" class="muted-line">Attiva solo durante la fase Distribution.</p>
+        <div id="population-distribution-controls" class="distribution-controls"></div>
       </section>
 
       <section class="card" aria-labelledby="cities-wonders-title">
@@ -52,9 +63,9 @@
       </section>
 
       <section class="card" aria-labelledby="controls-title">
-        <h2 id="controls-title">Controlli build/research (placeholder)</h2>
-        <p>Questa sezione ospiterà build, ricerca e redistribuzione popolazione nei prossimi step.</p>
-        <button id="end-turn-button" type="button">Concludi turno</button>
+        <h2 id="controls-title">Controlli turno</h2>
+        <p id="turn-help-text">Avvia il ciclo economico del turno.</p>
+        <button id="end-turn-button" type="button">Avvia turno economico</button>
       </section>
 
       <section class="card full-width" aria-labelledby="event-log-title">
