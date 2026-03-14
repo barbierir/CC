@@ -1,23 +1,22 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Historic Turns - Prototype</title>
+    <title>Civilization Browser Game</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <header class="page-header">
-      <h1>Historic Turns</h1>
-      <p class="subtitle">Prototype single-player ispirato ai boardgame storici</p>
+      <h1>Civilization Browser Game</h1>
+      <p class="subtitle">Setup iniziale, economia base e loop turni (v1)</p>
     </header>
 
     <main class="dashboard">
-      <section class="card" aria-labelledby="game-status-title">
-        <h2 id="game-status-title">Stato partita</h2>
-        <p><strong>Turno:</strong> <span id="turn-value">-</span></p>
-        <p><strong>Turni massimi:</strong> <span id="max-turns-value">-</span></p>
-        <p><strong>Cultura iniziale:</strong> <span id="culture-value">-</span></p>
+      <section class="card" aria-labelledby="status-title">
+        <h2 id="status-title">Stato partita</h2>
+        <p><strong>Turno:</strong> <span id="turn-value">1</span> / <span id="max-turns-value">50</span></p>
+        <p><strong>Cultura:</strong> <span id="culture-value">-</span></p>
         <p><strong>Advance iniziale:</strong> <span id="starting-advance-value">-</span></p>
         <p><strong>Fase:</strong> <span id="phase-value">-</span></p>
         <p><strong>Game Over:</strong> <span id="game-over-value">No</span></p>
@@ -56,6 +55,33 @@
         <h2 id="distribution-title">Population Distribution</h2>
         <p id="distribution-status" class="muted-line">Attiva solo durante la fase Distribution.</p>
         <div id="population-distribution-controls" class="distribution-controls"></div>
+      </section>
+
+      <section class="card" aria-labelledby="build-projects-title">
+        <h2 id="build-projects-title">Build Projects</h2>
+        <div class="build-controls">
+          <label for="project-type-select">Tipo progetto</label>
+          <select id="project-type-select">
+            <option value="city">New City</option>
+            <option value="wonder">Wonder</option>
+          </select>
+
+          <button id="start-city-project-button" type="button">Start City Project</button>
+
+          <div id="wonder-controls" class="wonder-controls">
+            <label for="wonder-select">Wonder disponibile</label>
+            <select id="wonder-select"></select>
+
+            <label for="wonder-city-select">Città ospitante</label>
+            <select id="wonder-city-select"></select>
+
+            <button id="start-wonder-project-button" type="button">Start Wonder Project</button>
+          </div>
+
+          <p id="build-status-message" class="muted-line"></p>
+
+          <div id="active-project-box" class="active-project-box"></div>
+        </div>
       </section>
 
       <section class="card" aria-labelledby="cities-wonders-title">

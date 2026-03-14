@@ -1,6 +1,6 @@
 // Cataloghi statici del gioco.
-// In questo step includono culture, advances, leader e nomi città
-// per consentire un setup iniziale realistico ed economia base.
+// In questo step includono culture, advances, leader, wonders e nomi città
+// per consentire setup iniziale realistico ed economia/produzione base.
 
 export const CULTURES = [
   { id: "egyptian", name: "Egyptian", startingAdvanceId: "engineering" },
@@ -69,7 +69,7 @@ export const ADVANCES = [
   {
     id: "architecture",
     name: "Architecture",
-    description: "Enhances city planning and major construction capabilities.",
+    description: "Reduces gold construction costs by 20%.",
     victoryPoints: 1,
   },
   {
@@ -167,7 +167,98 @@ export const LEADERS = [
   },
 ];
 
-export const WONDERS = [];
+export const WONDERS = [
+  {
+    id: "sphinx",
+    name: "Sphinx",
+    requirementAdvanceId: "art-sculpture",
+    description: "Future effect: strengthens culture and future wonder-related scoring.",
+    laborRequiredBase: 50,
+    goldCostBase: 25,
+    scoreValue: 15,
+  },
+  {
+    id: "colossus",
+    name: "Colossus",
+    requirementAdvanceId: "metal-working",
+    description: "Future effect: improves trade output and sea-connected prosperity.",
+    laborRequiredBase: 100,
+    goldCostBase: 50,
+    scoreValue: 15,
+  },
+  {
+    id: "oracle",
+    name: "Oracle",
+    requirementAdvanceId: "religion",
+    description: "Future effect: improves event control and spiritual bonuses.",
+    laborRequiredBase: 100,
+    goldCostBase: 50,
+    scoreValue: 15,
+  },
+  {
+    id: "hanging-gardens",
+    name: "Hanging Gardens",
+    requirementAdvanceId: "irrigation",
+    description: "Future effect: supports growth and food efficiency in your empire.",
+    laborRequiredBase: 100,
+    goldCostBase: 50,
+    scoreValue: 15,
+  },
+  {
+    id: "parthenon",
+    name: "Parthenon",
+    requirementAdvanceId: "architecture",
+    description: "Future effect: enhances cultural development and civic prestige.",
+    laborRequiredBase: 100,
+    goldCostBase: 50,
+    scoreValue: 15,
+  },
+  {
+    id: "stonehenge",
+    name: "Stonehenge",
+    requirementAdvanceId: "astronomy",
+    description: "Future effect: supports scientific and calendar-oriented improvements.",
+    laborRequiredBase: 50,
+    goldCostBase: 25,
+    scoreValue: 15,
+  },
+  {
+    id: "lighthouse",
+    name: "Lighthouse",
+    requirementAdvanceId: "navigation",
+    description: "Future effect: improves naval trade and connected city mobility.",
+    laborRequiredBase: 100,
+    goldCostBase: 50,
+    scoreValue: 15,
+  },
+  {
+    id: "pyramids",
+    name: "Pyramids",
+    requirementAdvanceId: "engineering",
+    description: "Future effect: strengthens building output and monument efficiency.",
+    laborRequiredBase: 100,
+    goldCostBase: 50,
+    scoreValue: 15,
+  },
+  {
+    id: "great-wall",
+    name: "Great Wall",
+    requirementAdvanceId: "coinage",
+    description: "Future effect: improves defense and border stability.",
+    laborRequiredBase: 100,
+    goldCostBase: 50,
+    scoreValue: 15,
+  },
+  {
+    id: "great-library",
+    name: "Great Library",
+    requirementAdvanceId: "literacy",
+    description: "Future effect: boosts research development and knowledge scaling.",
+    laborRequiredBase: 100,
+    goldCostBase: 50,
+    scoreValue: 15,
+  },
+];
 
 export const DISASTER_TYPES = [];
 

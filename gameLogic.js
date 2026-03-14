@@ -1,4 +1,4 @@
-import { ADVANCES, CITY_NAMES, CULTURES, LEADERS } from "./gameData.js";
+import { ADVANCES, CITY_NAMES, CULTURES, LEADERS, WONDERS } from "./gameData.js";
 
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
 
@@ -20,6 +20,10 @@ function removeOneValue(values, valueToRemove) {
 
 function findAdvanceById(advanceId) {
   return ADVANCES.find((advance) => advance.id === advanceId) || null;
+}
+
+function findWonderDefinitionById(wonderId) {
+  return WONDERS.find((wonder) => wonder.id === wonderId) || null;
 }
 
 function sumAssignments(assignments) {
@@ -101,6 +105,227 @@ export function rollDie(sides) {
   return Math.floor(Math.random() * numericSides) + 1;
 }
 
+function getConstructionCost(state, laborBase, goldBase) {
+  const laborRequired = hasAdvance(state, "engineering") ? Math.floor(laborBase * 0.8) : laborBase;
+  const goldCost = hasAdvance(state, "architecture") ? Math.floor(goldBase * 0.8) : goldBase;
+  return { laborRequired, goldCost };
+}
+
+export function getLaborProducedThisTurn(state) {
+  const laborPopulation = state.populationAssignments.labor || 0;
+  const builders = countLeadersByType(state, "builder");
+
+  let buildersLabor = 0;
+  for (let index = 0; index < builders; index += 1) {
+    buildersLabor += rollDie(6);
+  }
+
+  return laborPopulation + buildersLabor;
+}
+
+export function getAvailableWonderDefinitions(state) {
+  return WONDERS.filter((wonder) => {
+    if (!hasAdvance(state, wonder.requirementAdvanceId)) {
+      return false;
+    }
+
+    return !state.wonders.some((ownedWonder) => ownedWonder.id === wonder.id);
+  });
+}
+
+export function getUnusedCityName(state) {
+  if (!Array.isArray(state.availableCityNames) || state.availableCityNames.length === 0) {
+    return `City ${state.cities.length + 1}`;
+  }
+
+  const name = pickRandomItem(state.availableCityNames);
+  removeOneValue(state.availableCityNames, name);
+  return name;
+}
+
+export function canStartCityProject(state) {
+  if (state.currentProject) {
+    return { ok: false, reason: "Another project is already active" };
+  }
+
+  const { goldCost } = getConstructionCost(state, 50, 25);
+  if (state.gold < goldCost) {
+    return { ok: false, reason: `Not enough gold to start city project (${goldCost} required)` };
+  }
+
+  return { ok: true };
+}
+
+export function canStartWonderProject(state, wonderId, cityId) {
+  if (state.currentProject) {
+    return { ok: false, reason: "Another project is already active" };
+  }
+
+  const wonderDefinition = findWonderDefinitionById(wonderId);
+  if (!wonderDefinition) {
+    return { ok: false, reason: "Selected wonder is invalid" };
+  }
+
+  if (!hasAdvance(state, wonderDefinition.requirementAdvanceId)) {
+    return {
+      ok: false,
+      reason: `Advance required: ${findAdvanceById(wonderDefinition.requirementAdvanceId)?.name || wonderDefinition.requirementAdvanceId}`,
+    };
+  }
+
+  if (state.wonders.some((ownedWonder) => ownedWonder.id === wonderId)) {
+    return { ok: false, reason: "This wonder has already been built" };
+  }
+
+  const city = state.cities.find((item) => item.id === cityId);
+  if (!city) {
+    return { ok: false, reason: "Selected city is invalid" };
+  }
+
+  if (city.wonderId) {
+    return { ok: false, reason: "Selected city already hosts a wonder" };
+  }
+
+  const { goldCost } = getConstructionCost(
+    state,
+    wonderDefinition.laborRequiredBase,
+    wonderDefinition.goldCostBase
+  );
+
+  if (state.gold < goldCost) {
+    return {
+      ok: false,
+      reason: `Not enough gold to start wonder project (${goldCost} required)`,
+    };
+  }
+
+  return { ok: true };
+}
+
+export function createCityProject(state) {
+  const startCheck = canStartCityProject(state);
+  if (!startCheck.ok) {
+    state.gameLog.push(startCheck.reason);
+    return { ok: false, reason: startCheck.reason };
+  }
+
+  const { laborRequired, goldCost } = getConstructionCost(state, 50, 25);
+  state.gold -= goldCost;
+
+  const project = {
+    id: generateUniqueId(state, "project"),
+    type: "city",
+    targetId: null,
+    cityId: null,
+    name: "New City",
+    laborProgress: 0,
+    laborRequired,
+    goldCost,
+    startedTurn: state.turn,
+  };
+
+  state.currentProject = project;
+  state.gameLog.push(`Started city project (${goldCost} gold paid)`);
+
+  return { ok: true, project };
+}
+
+export function createWonderProject(state, wonderId, cityId) {
+  const startCheck = canStartWonderProject(state, wonderId, cityId);
+  if (!startCheck.ok) {
+    state.gameLog.push(startCheck.reason);
+    return { ok: false, reason: startCheck.reason };
+  }
+
+  const wonderDefinition = findWonderDefinitionById(wonderId);
+  const city = state.cities.find((item) => item.id === cityId);
+  const { laborRequired, goldCost } = getConstructionCost(
+    state,
+    wonderDefinition.laborRequiredBase,
+    wonderDefinition.goldCostBase
+  );
+
+  state.gold -= goldCost;
+
+  const project = {
+    id: generateUniqueId(state, "project"),
+    type: "wonder",
+    targetId: wonderDefinition.id,
+    cityId,
+    name: wonderDefinition.name,
+    laborProgress: 0,
+    laborRequired,
+    goldCost,
+    startedTurn: state.turn,
+  };
+
+  state.currentProject = project;
+  state.gameLog.push(`Started wonder project: ${wonderDefinition.name} in ${city.name} (${goldCost} gold paid)`);
+
+  return { ok: true, project };
+}
+
+function completeCityProject(state, project) {
+  const cityName = getUnusedCityName(state);
+  const newCity = {
+    id: generateUniqueId(state, "city"),
+    name: cityName,
+    wonderId: null,
+  };
+
+  state.cities.push(newCity);
+  state.gameLog.push(`New city completed: ${cityName}`);
+  state.gameLog.push(`Project completed: ${project.name}`);
+}
+
+function completeWonderProject(state, project) {
+  const city = state.cities.find((item) => item.id === project.cityId);
+  const wonderDefinition = findWonderDefinitionById(project.targetId);
+
+  if (!city || !wonderDefinition) {
+    state.gameLog.push(`Project failed to complete: ${project.name}`);
+    return;
+  }
+
+  city.wonderId = wonderDefinition.id;
+  state.wonders.push({
+    id: wonderDefinition.id,
+    name: wonderDefinition.name,
+    cityId: city.id,
+  });
+
+  state.gameLog.push(`Wonder completed: ${wonderDefinition.name} in ${city.name}`);
+  state.gameLog.push(`Project completed: ${project.name}`);
+}
+
+export function resolveBuildPhase(state) {
+  const producedLabor = getLaborProducedThisTurn(state);
+  state.gameLog.push(`Build produced ${producedLabor} labor`);
+
+  if (!state.currentProject) {
+    state.gameLog.push("No active build project");
+    return;
+  }
+
+  const project = state.currentProject;
+  project.laborProgress += producedLabor;
+  state.gameLog.push(
+    `Project advanced: ${project.name} (${Math.min(project.laborProgress, project.laborRequired)}/${project.laborRequired})`
+  );
+
+  if (project.laborProgress < project.laborRequired) {
+    return;
+  }
+
+  if (project.type === "city") {
+    completeCityProject(state, project);
+  } else if (project.type === "wonder") {
+    completeWonderProject(state, project);
+  }
+
+  state.currentProject = null;
+}
+
 /**
  * Crea lo stato iniziale del gioco.
  */
@@ -157,10 +382,11 @@ export function createInitialGameState() {
     advances: selectedAdvance ? [selectedAdvance.id] : [],
     idCounters: {
       leader: 0,
+      city: 1,
+      project: 0,
     },
     skipBuildPhase: false,
     currentProject: null,
-    projectProgress: 0,
     gameLog,
     gameOver: false,
     currentPhase: "ready",
@@ -249,7 +475,6 @@ function runUpkeepPhase(state) {
   }
 }
 
-// Sequenza scelta: Harvest -> Upkeep -> Leader aging -> Trade.
 function runLeaderAgingPhase(state) {
   const survivors = [];
 
@@ -356,11 +581,6 @@ export function applyPopulationChange(state, role, delta) {
   return { ok: false, reason: "Delta must be +1 or -1" };
 }
 
-/**
- * Loop turno economico base in 2 step:
- * - click 1: Population Increase e avvio Distribution
- * - click 2: conferma Distribution e risoluzione fasi economiche
- */
 export function nextTurn(state) {
   if (state.gameOver) {
     state.gameLog.push("La partita è terminata. Nessun altro turno disponibile.");
@@ -374,18 +594,21 @@ export function nextTurn(state) {
   }
 
   if (state.currentPhase === "distribution") {
-    // Ordine turno attuale:
+    // Ordine turno:
     // 1) Population Increase (già fatto al click precedente)
     // 2) Population Distribution (gestita dalla UI)
     // 3) Gain Leader
     // 4) Harvest
     // 5) Upkeep
-    // 6) Trade (dopo aging leader)
+    // 6) Leader aging
+    // 7) Trade
+    // 8) Build
     runGainLeaderPhase(state);
     runHarvestPhase(state);
     runUpkeepPhase(state);
     runLeaderAgingPhase(state);
     runTradePhase(state);
+    resolveBuildPhase(state);
 
     state.turn += 1;
     state.currentPhase = "ready";

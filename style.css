@@ -100,16 +100,25 @@ body {
   gap: 0.5rem;
 }
 
-.distribution-row button {
-  min-width: 2rem;
+.distribution-row button,
+.build-controls button,
+.build-controls select {
+  min-height: 2rem;
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 0.25rem 0.4rem;
   background: #f4f7fc;
+  font: inherit;
+}
+
+.distribution-row button,
+.build-controls button {
   cursor: pointer;
 }
 
-.distribution-row button:disabled {
+.distribution-row button:disabled,
+.build-controls button:disabled,
+.build-controls select:disabled {
   cursor: not-allowed;
   opacity: 0.5;
 }
@@ -126,6 +135,26 @@ body {
 
 .muted-line {
   color: var(--muted);
+}
+
+.build-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.wonder-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-top: 0.2rem;
+}
+
+.active-project-box {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 0.6rem;
+  background: #fbfcfe;
 }
 
 #end-turn-button {

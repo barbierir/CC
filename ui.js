@@ -1,7 +1,12 @@
 import { ADVANCES } from "./gameData.js";
 import {
   applyPopulationChange,
+  canStartCityProject,
+  canStartWonderProject,
+  createCityProject,
   createInitialGameState,
+  createWonderProject,
+  getAvailableWonderDefinitions,
   getEconomyPreview,
   nextTurn,
 } from "./gameLogic.js";
@@ -43,6 +48,14 @@ const elements = {
   eventLogList: document.getElementById("event-log-list"),
   endTurnButton: document.getElementById("end-turn-button"),
   turnHelpText: document.getElementById("turn-help-text"),
+  projectTypeSelect: document.getElementById("project-type-select"),
+  startCityProjectButton: document.getElementById("start-city-project-button"),
+  wonderControls: document.getElementById("wonder-controls"),
+  wonderSelect: document.getElementById("wonder-select"),
+  wonderCitySelect: document.getElementById("wonder-city-select"),
+  startWonderProjectButton: document.getElementById("start-wonder-project-button"),
+  buildStatusMessage: document.getElementById("build-status-message"),
+  activeProjectBox: document.getElementById("active-project-box"),
 };
 
 function renderList(listElement, values, emptyLabel) {
@@ -93,6 +106,18 @@ function formatRulerTrade(range, rulerCount) {
   }
 
   return `${range.min}-${range.max} (${rulerCount} Ruler${rulerCount > 1 ? "s" : ""})`;
+}
+
+function formatProjectSummary(project) {
+  if (!project) {
+    return "Nessuno";
+  }
+
+  if (project.type === "city") {
+    return `New City (${project.laborProgress}/${project.laborRequired})`;
+  }
+
+  return `${project.name} (${project.laborProgress}/${project.laborRequired})`;
 }
 
 function createDistributionRow(role, amount, isActiveDistribution) {
@@ -161,6 +186,88 @@ function renderLeaders(state) {
   renderList(elements.leadersList, leaderValues, "No leaders");
 }
 
+function getWonderHostCities(state) {
+  return state.cities.filter((city) => !city.wonderId);
+}
+
+function renderWonderSelection(state) {
+  const availableWonders = getAvailableWonderDefinitions(state);
+  const availableCities = getWonderHostCities(state);
+
+  elements.wonderSelect.innerHTML = "";
+  availableWonders.forEach((wonder) => {
+    const option = document.createElement("option");
+    option.value = wonder.id;
+    option.textContent = `${wonder.name} (req: ${getAdvanceNameById(wonder.requirementAdvanceId)})`;
+    elements.wonderSelect.appendChild(option);
+  });
+
+  if (availableWonders.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Nessun wonder disponibile";
+    elements.wonderSelect.appendChild(option);
+  }
+
+  elements.wonderCitySelect.innerHTML = "";
+  availableCities.forEach((city) => {
+    const option = document.createElement("option");
+    option.value = city.id;
+    option.textContent = city.name;
+    elements.wonderCitySelect.appendChild(option);
+  });
+
+  if (availableCities.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Nessuna città disponibile";
+    elements.wonderCitySelect.appendChild(option);
+  }
+
+  const selectedWonderId = elements.wonderSelect.value;
+  const selectedCityId = elements.wonderCitySelect.value;
+  const startCheck = canStartWonderProject(state, selectedWonderId, selectedCityId);
+
+  elements.startWonderProjectButton.disabled = !startCheck.ok;
+
+  if (!startCheck.ok && selectedWonderId && selectedCityId) {
+    elements.buildStatusMessage.textContent = startCheck.reason;
+  }
+}
+
+function renderBuildControls(state) {
+  const projectType = elements.projectTypeSelect.value;
+  elements.wonderControls.style.display = projectType === "wonder" ? "flex" : "none";
+
+  const cityStartCheck = canStartCityProject(state);
+  elements.startCityProjectButton.disabled = !cityStartCheck.ok;
+
+  if (projectType === "city" && !cityStartCheck.ok) {
+    elements.buildStatusMessage.textContent = cityStartCheck.reason;
+  }
+
+  renderWonderSelection(state);
+
+  if (state.currentProject) {
+    const project = state.currentProject;
+    const cityLabel =
+      project.type === "wonder"
+        ? state.cities.find((city) => city.id === project.cityId)?.name || "Unknown city"
+        : "-";
+
+    elements.activeProjectBox.innerHTML = `
+      <strong>Progetto attivo</strong><br />
+      Nome: ${project.name}<br />
+      Tipo: ${project.type}<br />
+      Labor: ${project.laborProgress}/${project.laborRequired}<br />
+      Gold pagato: ${project.goldCost}<br />
+      Città: ${cityLabel}
+    `;
+  } else {
+    elements.activeProjectBox.innerHTML = "<strong>Progetto attivo</strong><br />Nessuno";
+  }
+}
+
 export function renderGame(state) {
   const economyPreview = getEconomyPreview(state);
 
@@ -172,7 +279,7 @@ export function renderGame(state) {
     : "Nessuno";
   elements.phaseValue.textContent = getPhaseLabel(state.currentPhase);
   elements.gameOverValue.textContent = state.gameOver ? "Sì" : "No";
-  elements.projectValue.textContent = state.currentProject || "Nessuno";
+  elements.projectValue.textContent = formatProjectSummary(state.currentProject);
 
   elements.foodValue.textContent = String(state.food);
   elements.goldValue.textContent = String(state.gold);
@@ -202,11 +309,19 @@ export function renderGame(state) {
   elements.cityCountValue.textContent = String(state.cities.length);
   renderList(
     elements.citiesList,
-    state.cities.map((city) => city.name),
+    state.cities.map((city) => `${city.name}${city.wonderId ? ` (Wonder: ${city.wonderId})` : ""}`),
     "Nessuna città"
   );
 
-  renderList(elements.wondersList, state.wonders, "Nessun wonder");
+  renderList(
+    elements.wondersList,
+    state.wonders.map((wonder) => {
+      const cityName = state.cities.find((city) => city.id === wonder.cityId)?.name || "Unknown";
+      return `${wonder.name} in ${cityName}`;
+    }),
+    "Nessun wonder"
+  );
+
   renderList(
     elements.advancesList,
     state.advances.map((advanceId) => getAdvanceNameById(advanceId)),
@@ -214,23 +329,60 @@ export function renderGame(state) {
   );
   renderLeaders(state);
 
-  // Log in ordine inverso: eventi più recenti in alto.
   renderList(elements.eventLogList, [...state.gameLog].reverse(), "Nessun evento");
 
   if (state.currentPhase === "distribution") {
     elements.endTurnButton.textContent = "Conferma distribuzione e completa turno";
     elements.turnHelpText.textContent =
-      "Distribuisci popolazione, poi conferma per Gain Leader + Harvest + Upkeep + Trade.";
+      "Distribuisci popolazione, poi conferma per Gain Leader + Harvest + Upkeep + Leader Aging + Trade + Build.";
   } else {
     elements.endTurnButton.textContent = "Avvia turno economico";
     elements.turnHelpText.textContent = "Esegue Population Increase e apre la Distribution.";
   }
 
   elements.endTurnButton.disabled = state.gameOver;
+  renderBuildControls(state);
 }
 
 elements.endTurnButton.addEventListener("click", () => {
   nextTurn(gameState);
+  renderGame(gameState);
+});
+
+elements.projectTypeSelect.addEventListener("change", () => {
+  elements.buildStatusMessage.textContent = "";
+  renderGame(gameState);
+});
+
+elements.wonderSelect.addEventListener("change", () => {
+  renderGame(gameState);
+});
+
+elements.wonderCitySelect.addEventListener("change", () => {
+  renderGame(gameState);
+});
+
+elements.startCityProjectButton.addEventListener("click", () => {
+  const result = createCityProject(gameState);
+  if (!result.ok) {
+    elements.buildStatusMessage.textContent = result.reason;
+  } else {
+    elements.buildStatusMessage.textContent = "City project started.";
+  }
+  renderGame(gameState);
+});
+
+elements.startWonderProjectButton.addEventListener("click", () => {
+  const wonderId = elements.wonderSelect.value;
+  const cityId = elements.wonderCitySelect.value;
+  const result = createWonderProject(gameState, wonderId, cityId);
+
+  if (!result.ok) {
+    elements.buildStatusMessage.textContent = result.reason;
+  } else {
+    elements.buildStatusMessage.textContent = "Wonder project started.";
+  }
+
   renderGame(gameState);
 });
 
