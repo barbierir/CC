@@ -18,6 +18,7 @@ const {
 } = window.GameLogic;
 
 const POPULATION_ROLES = ["army", "agriculture", "trade", "labor", "scholars"];
+const DEFAULT_VISIBLE_LOG_ENTRIES = 5;
 
 const SPECIALIST_TOOLTIPS = {
   army: "Army: combatte in guerra ma consuma 1 gold in upkeep.",
@@ -39,35 +40,24 @@ const ADVANCE_MITIGATION_HINTS = {
 };
 
 const gameState = createInitialGameState();
+let showFullLog = false;
 
 const elements = {
   turnValue: document.getElementById("turn-value"),
   maxTurnsValue: document.getElementById("max-turns-value"),
   cultureValue: document.getElementById("culture-value"),
-  startingAdvanceValue: document.getElementById("starting-advance-value"),
   phaseValue: document.getElementById("phase-value"),
   headerPhaseChip: document.getElementById("header-phase-chip"),
-  phaseChip: document.getElementById("phase-chip"),
   warPeaceValue: document.getElementById("war-peace-value"),
-  warPeaceChip: document.getElementById("war-peace-chip"),
-  gameOverValue: document.getElementById("game-over-value"),
-  gameOverChip: document.getElementById("game-over-chip"),
-  projectValue: document.getElementById("project-value"),
   lastDisasterValue: document.getElementById("last-disaster-value"),
   lastWarValue: document.getElementById("last-war-value"),
-  warTypeValue: document.getElementById("war-type-value"),
-  warEnemyValue: document.getElementById("war-enemy-value"),
-  warResultValue: document.getElementById("war-result-value"),
   warStatusBadge: document.getElementById("war-status-badge"),
-  disasterLastValue: document.getElementById("disaster-last-value"),
   disasterStatusBadge: document.getElementById("disaster-status-badge"),
   buildSkippedBadge: document.getElementById("build-skipped-badge"),
-  summaryCulture: document.getElementById("summary-culture"),
-  summaryTurn: document.getElementById("summary-turn"),
-  summaryPopulation: document.getElementById("summary-population"),
   summaryCities: document.getElementById("summary-cities"),
   summaryWonders: document.getElementById("summary-wonders"),
   summaryAdvances: document.getElementById("summary-advances"),
+  summaryLeaders: document.getElementById("summary-leaders"),
   foodValue: document.getElementById("food-value"),
   goldValue: document.getElementById("gold-value"),
   populationTotalResourceValue: document.getElementById("population-total-resource-value"),
@@ -75,24 +65,12 @@ const elements = {
   foodProductionPreview: document.getElementById("food-production-preview"),
   foodUpkeepPreview: document.getElementById("food-upkeep-preview"),
   goldUpkeepPreview: document.getElementById("gold-upkeep-preview"),
-  tradePopulationPreview: document.getElementById("trade-population-preview"),
-  tradeCitiesPreview: document.getElementById("trade-cities-preview"),
-  tradeCoinagePreview: document.getElementById("trade-coinage-preview"),
-  tradeNavigationPreview: document.getElementById("trade-navigation-preview"),
-  tradeRulersPreview: document.getElementById("trade-rulers-preview"),
-  tradeTotalPreview: document.getElementById("trade-total-preview"),
   goldProductionPreview: document.getElementById("gold-production-preview"),
-  researchScholarsPreview: document.getElementById("research-scholars-preview"),
-  researchThinkersPreview: document.getElementById("research-thinkers-preview"),
-  researchAstronomyPreview: document.getElementById("research-astronomy-preview"),
-  researchLiteracyPreview: document.getElementById("research-literacy-preview"),
-  researchMathematicsPreview: document.getElementById("research-mathematics-preview"),
-  researchGreatLibraryPreview: document.getElementById("research-great-library-preview"),
-  researchAdvancesTotalPreview: document.getElementById("research-advances-total-preview"),
-  researchWondersTotalPreview: document.getElementById("research-wonders-total-preview"),
   researchTotalPreview: document.getElementById("research-total-preview"),
+  netTurnPreview: document.getElementById("net-turn-preview"),
+  scholarsCapValue: document.getElementById("scholars-cap-value"),
   populationTotalValue: document.getElementById("population-total-value"),
-  populationAssignmentsList: document.getElementById("population-assignments-list"),
+  populationAssignmentSummary: document.getElementById("population-assignment-summary"),
   populationDistributionControls: document.getElementById("population-distribution-controls"),
   distributionStatus: document.getElementById("distribution-status"),
   cityCountValue: document.getElementById("city-count-value"),
@@ -101,12 +79,12 @@ const elements = {
   advancesList: document.getElementById("advances-list"),
   leadersList: document.getElementById("leaders-list"),
   eventLogList: document.getElementById("event-log-list"),
+  toggleLogButton: document.getElementById("toggle-log-button"),
   endTurnButton: document.getElementById("end-turn-button"),
   turnHelpText: document.getElementById("turn-help-text"),
   turnReasonText: document.getElementById("turn-reason-text"),
   readinessBadge: document.getElementById("readiness-badge"),
   recommendedActionTitle: document.getElementById("recommended-action-title"),
-  recommendedActionText: document.getElementById("recommended-action-text"),
   projectPhaseBadge: document.getElementById("project-phase-badge"),
   projectTypeSelect: document.getElementById("project-type-select"),
   startCityProjectButton: document.getElementById("start-city-project-button"),
@@ -121,6 +99,9 @@ const elements = {
   buildLaborRequired: document.getElementById("build-labor-required"),
   buildProjectCity: document.getElementById("build-project-city"),
   surrenderIfWarCheckbox: document.getElementById("surrender-if-war-checkbox"),
+  workflowStepDistribution: document.getElementById("workflow-step-distribution"),
+  workflowStepBuild: document.getElementById("workflow-step-build"),
+  workflowStepEnd: document.getElementById("workflow-step-end"),
   finalScorePanel: document.getElementById("final-score-panel"),
   finalScoreDetails: document.getElementById("final-score-details"),
   endlessModeMessage: document.getElementById("endless-mode-message"),
@@ -161,11 +142,7 @@ function getAdvanceNameById(advanceId) {
 }
 
 function getPhaseLabel(phase) {
-  if (phase === "distribution") {
-    return "Population Distribution";
-  }
-
-  return "Pronto";
+  return phase === "distribution" ? "Population Distribution" : "Ready";
 }
 
 function formatTradeTotalRange(range) {
@@ -176,28 +153,22 @@ function formatTradeTotalRange(range) {
   return `${range.min}-${range.max}`;
 }
 
-function formatRulerTrade(range, rulerCount) {
-  if (rulerCount === 0) {
-    return "0";
-  }
-
-  if (range.min === range.max) {
-    return `${range.min}`;
-  }
-
-  return `${range.min}-${range.max} (${rulerCount} Ruler${rulerCount > 1 ? "s" : ""})`;
+function formatNetRange(range, upkeep) {
+  const min = range.min - upkeep;
+  const max = range.max - upkeep;
+  return min === max ? `${min}` : `${min}-${max}`;
 }
 
 function formatProjectSummary(project) {
   if (!project) {
-    return "Nessuno";
+    return "No active project";
   }
 
   if (project.type === "city") {
-    return `New City (${project.laborProgress}/${project.laborRequired})`;
+    return `New City`;
   }
 
-  return `${project.name} (${project.laborProgress}/${project.laborRequired})`;
+  return project.name;
 }
 
 function updateStatusAppearance(element, tone) {
@@ -220,6 +191,10 @@ function updateStatusAppearance(element, tone) {
   }
 }
 
+function getWonderHostCities(state) {
+  return state.cities.filter((city) => !city.wonderId);
+}
+
 function getTurnUxState(state) {
   const cityStartCheck = canStartCityProject(state);
   const hostCities = getWonderHostCities(state);
@@ -229,63 +204,93 @@ function getTurnUxState(state) {
     availableWonders[0]?.id || "",
     hostCities[0]?.id || ""
   );
-
   const hasBuildOpportunity = cityStartCheck.ok || wonderStartCheck.ok;
 
   if (state.gameOver) {
     return {
       readiness: "Game Over",
       readinessTone: "danger",
-      reason: "La partita è conclusa. Puoi rivedere il punteggio finale o continuare in endless mode.",
+      reason: "La partita è conclusa. Puoi consultare il punteggio finale o proseguire in endless mode.",
       actionTitle: "Partita conclusa",
-      actionText: "Non ci sono altre azioni obbligatorie sul turno corrente.",
+      actionText: "Nessuna azione del turno disponibile.",
+      currentStep: "end",
+      endTurnDisabled: true,
+      endTurnReason: "La partita è conclusa.",
     };
   }
 
   if (state.currentPhase === "distribution") {
     return {
-      readiness: "Distribuzione richiesta",
+      readiness: "Step 1 attivo",
       readinessTone: "warning",
-      reason: "Completa la distribuzione della popolazione prima di concludere il turno.",
+      reason: `Distribuisci la popolazione per continuare. Scholars ${state.populationAssignments.scholars}/${state.cities.length} max.`,
       actionTitle: "Distribuisci la popolazione",
-      actionText: "Ribilancia agricoltura, trade, labor, army e scholars: è la priorità di questo turno.",
+      actionText: "Completa lo Step 1: assegna i cittadini e poi concludi il turno.",
+      currentStep: "distribution",
+      endTurnDisabled: false,
+      endTurnReason: "",
     };
   }
 
   if (hasBuildOpportunity) {
     return {
-      readiness: "Pronto",
+      readiness: "Step 2 opzionale",
       readinessTone: "success",
-      reason: "Puoi chiudere il turno oppure aprire un nuovo progetto se vuoi convertire subito le risorse.",
-      actionTitle: "Valuta un progetto",
-      actionText: "Hai abbastanza risorse per iniziare un progetto di città o wonder, quindi questa è una buona finestra per investire.",
+      reason: "Puoi avviare un progetto oppure chiudere subito il turno.",
+      actionTitle: "Puoi avviare un progetto oppure concludere il turno",
+      actionText: "Lo Step 2 è opzionale: investi ora oppure passa direttamente allo Step 3.",
+      currentStep: "build",
+      endTurnDisabled: false,
+      endTurnReason: "",
     };
   }
 
   return {
-    readiness: "Pronto",
+    readiness: "Step 3 disponibile",
     readinessTone: "success",
-    reason: "Nessun blocco attivo: puoi concludere il turno quando vuoi.",
-    actionTitle: state.lastWarSummary ? "Ricostruisci dopo la guerra" : "Concludi il turno",
-    actionText: state.lastWarSummary
-      ? "Non ci sono guerre attive ora: controlla risorse e produzione prima di avanzare."
-      : "La dashboard è pronta: passa al prossimo ciclo per avanzare economia, build e ricerca.",
+    reason: "Nessun blocco attivo: puoi concludere il turno.",
+    actionTitle: "Concludi il turno",
+    actionText: "Hai già tutte le informazioni necessarie per decidere il prossimo ciclo.",
+    currentStep: "end",
+    endTurnDisabled: false,
+    endTurnReason: "",
   };
+}
+
+function setWorkflowStepState(activeStep) {
+  const stepMap = [
+    { element: elements.workflowStepDistribution, key: "distribution" },
+    { element: elements.workflowStepBuild, key: "build" },
+    { element: elements.workflowStepEnd, key: "end" },
+  ];
+
+  const activeIndex = stepMap.findIndex((step) => step.key === activeStep);
+  stepMap.forEach((step, index) => {
+    step.element.classList.remove("is-active", "is-complete");
+    if (index < activeIndex) {
+      step.element.classList.add("is-complete");
+    } else if (index === activeIndex) {
+      step.element.classList.add("is-active");
+    }
+  });
 }
 
 function createDistributionRow(role, amount, isActiveDistribution, state) {
   const row = document.createElement("div");
   row.className = "distribution-row";
 
-  const label = document.createElement("span");
-  label.className = "distribution-label";
+  const labelWrap = document.createElement("div");
 
-  if (role === "scholars") {
-    label.textContent = `scholars: ${amount} / ${state.cities.length} max`;
-  } else {
-    label.textContent = role;
-  }
+  const label = document.createElement("div");
+  label.className = "distribution-label";
+  label.textContent = role;
   label.title = SPECIALIST_TOOLTIPS[role] || "";
+
+  const meta = document.createElement("div");
+  meta.className = "distribution-meta";
+  meta.textContent = role === "scholars" ? `max ${state.cities.length}` : "";
+
+  labelWrap.append(label, meta);
 
   const minusButton = document.createElement("button");
   minusButton.type = "button";
@@ -319,29 +324,28 @@ function createDistributionRow(role, amount, isActiveDistribution, state) {
     renderGame(gameState);
   });
 
-  row.append(label, minusButton, amountValue, plusButton);
+  row.append(labelWrap, minusButton, amountValue, plusButton);
   return row;
 }
 
 function renderDistributionControls(state) {
   elements.populationDistributionControls.innerHTML = "";
-
   const isActiveDistribution = state.currentPhase === "distribution";
 
   POPULATION_ROLES.forEach((role) => {
     const amount = state.populationAssignments[role] || 0;
-    const row = createDistributionRow(role, amount, isActiveDistribution, state);
-    elements.populationDistributionControls.appendChild(row);
+    elements.populationDistributionControls.appendChild(
+      createDistributionRow(role, amount, isActiveDistribution, state)
+    );
   });
 
-  if (isActiveDistribution) {
-    const armyIncreaseCheck = canIncreasePopulationRole(state, "army");
-    const armyHint = armyIncreaseCheck.ok ? "" : ` Army: ${armyIncreaseCheck.reason}.`;
-    elements.distributionStatus.textContent =
-      `Distribuisci ora la popolazione: scholars ${state.populationAssignments.scholars}/${state.cities.length} max.${armyHint}`;
-  } else {
-    elements.distributionStatus.textContent = "Questa sezione si attiva quando il turno entra nella fase Distribution.";
-  }
+  elements.distributionStatus.textContent = isActiveDistribution
+    ? `Distribuisci ora la popolazione. Scholars ${state.populationAssignments.scholars}/${state.cities.length} max.`
+    : "Questa sezione si attiva quando il turno entra nella fase Distribution.";
+
+  elements.populationAssignmentSummary.textContent = POPULATION_ROLES
+    .map((role) => `${role[0].toUpperCase()}${role.slice(1)} ${state.populationAssignments[role] || 0}`)
+    .join(" · ");
 }
 
 function renderLeaders(state) {
@@ -349,10 +353,6 @@ function renderLeaders(state) {
     (leader) => `${leader.name} — ${leader.description} [${leader.uniqueId}]`
   );
   renderList(elements.leadersList, leaderValues, "No leaders");
-}
-
-function getWonderHostCities(state) {
-  return state.cities.filter((city) => !city.wonderId);
 }
 
 function renderWonderSelection(state) {
@@ -392,7 +392,6 @@ function renderWonderSelection(state) {
   const selectedWonderId = elements.wonderSelect.value;
   const selectedCityId = elements.wonderCitySelect.value;
   const startCheck = canStartWonderProject(state, selectedWonderId, selectedCityId);
-
   elements.startWonderProjectButton.disabled = !startCheck.ok;
 
   if (!startCheck.ok && selectedWonderId && selectedCityId) {
@@ -418,9 +417,9 @@ function renderBuildControls(state) {
     const cityLabel =
       project.type === "wonder"
         ? state.cities.find((city) => city.id === project.cityId)?.name || "Unknown city"
-        : "-";
+        : "All cities";
 
-    elements.buildCurrentProject.textContent = `${project.name} (${project.type})`;
+    elements.buildCurrentProject.textContent = `${formatProjectSummary(project)} (${project.type})`;
     elements.buildLaborProgress.textContent = String(project.laborProgress);
     elements.buildLaborRequired.textContent = String(project.laborRequired);
     elements.buildProjectCity.textContent = cityLabel;
@@ -434,13 +433,22 @@ function renderBuildControls(state) {
 
 function renderEventLog(state) {
   elements.eventLogList.innerHTML = "";
-  const logValues = [...state.gameLog];
+  const allEntries = [...state.gameLog];
 
-  if (logValues.length === 0) {
+  if (allEntries.length === 0) {
     const li = document.createElement("li");
     li.textContent = "Nessun evento";
     elements.eventLogList.appendChild(li);
+    if (elements.toggleLogButton) {
+      elements.toggleLogButton.hidden = true;
+    }
     return;
+  }
+
+  const logValues = showFullLog ? allEntries : allEntries.slice(-DEFAULT_VISIBLE_LOG_ENTRIES);
+  if (elements.toggleLogButton) {
+    elements.toggleLogButton.hidden = allEntries.length <= DEFAULT_VISIBLE_LOG_ENTRIES;
+    elements.toggleLogButton.textContent = showFullLog ? "Mostra meno" : "Vedi tutto";
   }
 
   logValues.forEach((entry, index) => {
@@ -470,7 +478,6 @@ function renderEventLog(state) {
 }
 
 function renderGame(state) {
-  console.log("[DEBUG] renderGame", { turn: state?.turn, phase: state?.currentPhase, logEntries: state?.gameLog?.length });
   const economyPreview = getEconomyPreview(state);
   const researchBreakdown = getResearchRollBreakdown(state);
   const currentPhaseLabel = getPhaseLabel(state.currentPhase);
@@ -485,35 +492,21 @@ function renderGame(state) {
   elements.turnValue.textContent = String(state.turn);
   elements.maxTurnsValue.textContent = String(state.maxTurns);
   elements.cultureValue.textContent = state.culture.name;
-  elements.startingAdvanceValue.textContent = state.startingAdvanceId
-    ? getAdvanceNameById(state.startingAdvanceId)
-    : "Nessuno";
   elements.phaseValue.textContent = currentPhaseLabel;
   elements.headerPhaseChip.textContent = currentPhaseLabel;
-  elements.gameOverValue.textContent = state.gameOver ? "Game Over" : "In corso";
-  elements.projectValue.textContent = formatProjectSummary(state.currentProject);
   elements.lastDisasterValue.textContent = lastDisasterText;
   elements.lastWarValue.textContent = lastWarText;
 
-  elements.summaryCulture.textContent = state.culture.name;
-  elements.summaryTurn.textContent = `${state.turn}/${state.maxTurns}`;
-  elements.summaryPopulation.textContent = String(state.populationTotal);
   elements.summaryCities.textContent = String(state.cities.length);
   elements.summaryWonders.textContent = String(state.wonders.length);
   elements.summaryAdvances.textContent = String(state.advances.length);
+  elements.summaryLeaders.textContent = String(state.leaders.length);
 
-  elements.disasterLastValue.textContent = lastDisasterText;
-  elements.disasterStatusBadge.textContent = state.lastDisaster ? state.lastDisaster.name : "Nessuno";
+  elements.disasterStatusBadge.textContent = state.lastDisaster ? state.lastDisaster.name : "No disaster";
+  elements.warPeaceValue.textContent = state.pendingWar ? "War" : "Peace";
+  elements.warStatusBadge.textContent = state.pendingWar ? "In progress" : "Peace";
 
-  elements.warTypeValue.textContent = state.lastWarSummary ? state.lastWarSummary.name : "Nessuna";
-  elements.warEnemyValue.textContent = state.lastWarSummary ? String(state.lastWarSummary.enemyArmies) : "-";
-  elements.warResultValue.textContent = state.lastWarSummary ? state.lastWarSummary.result : "-";
-  elements.warPeaceValue.textContent = state.pendingWar ? "Guerra imminente" : "Pace";
-  elements.warStatusBadge.textContent = state.pendingWar ? "Guerra" : "Pace";
-
-  updateStatusAppearance(elements.phaseChip, state.currentPhase === "distribution" ? "warning" : "success");
-  updateStatusAppearance(elements.gameOverChip, state.gameOver ? "danger" : "success");
-  updateStatusAppearance(elements.warPeaceChip, state.pendingWar ? "danger" : "success");
+  updateStatusAppearance(elements.headerPhaseChip, state.currentPhase === "distribution" ? "warning" : "success");
   updateStatusAppearance(elements.warStatusBadge, state.pendingWar ? "danger" : "success");
   updateStatusAppearance(elements.disasterStatusBadge, state.lastDisaster ? "warning" : "success");
 
@@ -524,35 +517,16 @@ function renderGame(state) {
   elements.foodProductionPreview.textContent = String(economyPreview.foodProduction);
   elements.foodUpkeepPreview.textContent = String(economyPreview.foodUpkeep);
   elements.goldUpkeepPreview.textContent = String(economyPreview.armyGoldUpkeep);
-
-  elements.tradePopulationPreview.textContent = String(economyPreview.tradePopulationGold);
-  elements.tradeCitiesPreview.textContent = String(economyPreview.citiesGold);
-  elements.tradeCoinagePreview.textContent = String(economyPreview.coinageGold);
-  elements.tradeNavigationPreview.textContent = String(economyPreview.navigationGold);
-  elements.tradeRulersPreview.textContent = formatRulerTrade(
-    economyPreview.rulerGoldRange,
-    economyPreview.rulerCount
-  );
-  elements.tradeTotalPreview.textContent = formatTradeTotalRange(economyPreview.tradeGoldRange);
   elements.goldProductionPreview.textContent = formatTradeTotalRange(economyPreview.tradeGoldRange);
-
-  elements.researchScholarsPreview.textContent = String(researchBreakdown.scholars);
-  elements.researchThinkersPreview.textContent = String(researchBreakdown.thinkers);
-  elements.researchAstronomyPreview.textContent = String(researchBreakdown.astronomyBonus);
-  elements.researchLiteracyPreview.textContent = String(researchBreakdown.literacyBonus);
-  elements.researchMathematicsPreview.textContent = String(researchBreakdown.mathematicsBonus);
-  elements.researchGreatLibraryPreview.textContent = String(researchBreakdown.greatLibraryBonus);
-  elements.researchAdvancesTotalPreview.textContent = String(
-    researchBreakdown.astronomyBonus + researchBreakdown.literacyBonus + researchBreakdown.mathematicsBonus
-  );
-  elements.researchWondersTotalPreview.textContent = String(researchBreakdown.greatLibraryBonus);
   elements.researchTotalPreview.textContent = String(researchBreakdown.totalRolls);
+  elements.netTurnPreview.textContent =
+    `${economyPreview.foodProduction - economyPreview.foodUpkeep} food / ${formatNetRange(
+      economyPreview.tradeGoldRange,
+      economyPreview.armyGoldUpkeep
+    )} gold`;
 
   elements.populationTotalValue.textContent = String(state.populationTotal);
-  const assignments = Object.entries(state.populationAssignments).map(
-    ([role, amount]) => `${role}: ${amount}`
-  );
-  renderList(elements.populationAssignmentsList, assignments, "Nessuna assegnazione");
+  elements.scholarsCapValue.textContent = String(state.cities.length);
   renderDistributionControls(state);
 
   elements.cityCountValue.textContent = String(state.cities.length);
@@ -607,21 +581,19 @@ function renderGame(state) {
   elements.readinessBadge.textContent = turnUx.readiness;
   elements.turnReasonText.textContent = turnUx.reason;
   elements.recommendedActionTitle.textContent = turnUx.actionTitle;
-  elements.recommendedActionText.textContent = turnUx.actionText;
+  elements.turnHelpText.textContent = turnUx.actionText;
   updateStatusAppearance(elements.readinessBadge, turnUx.readinessTone);
+  setWorkflowStepState(turnUx.currentStep);
 
-  if (state.currentPhase === "distribution") {
-    elements.endTurnButton.textContent = "Concludi turno";
-    elements.turnHelpText.textContent =
-      "Distribuisci popolazione, poi conferma per eseguire leader, raccolto, disaster, upkeep, war, trade, build e research.";
-  } else {
-    elements.endTurnButton.textContent = "Concludi turno";
-    elements.turnHelpText.textContent = "Avanza il turno: population increase e apertura della fase Distribution.";
-  }
-
-  elements.projectPhaseBadge.textContent = state.currentProject ? "Progetto in corso" : "Nessun progetto";
-  elements.buildSkippedBadge.textContent = state.skipBuildPhase ? "Build saltata" : "Build ok";
+  elements.endTurnButton.textContent = "Concludi turno";
+  elements.endTurnButton.disabled = turnUx.endTurnDisabled;
+  elements.buildSkippedBadge.textContent = state.skipBuildPhase ? "Build saltata" : "Build opzionale";
   updateStatusAppearance(elements.buildSkippedBadge, state.skipBuildPhase ? "warning" : "success");
+  elements.projectPhaseBadge.textContent = state.currentProject ? "In progress" : "Optional";
+
+  if (turnUx.endTurnDisabled && turnUx.endTurnReason) {
+    elements.turnReasonText.textContent = turnUx.endTurnReason;
+  }
 
   if (state.gameOver) {
     const score = state.scoreEnabled === false ? null : (state.finalScore || calculateFinalScore(state));
@@ -636,13 +608,10 @@ function renderGame(state) {
       elements.finalWonderPoints.textContent = String(score.wonderPoints);
       elements.finalTotalScore.textContent = String(score.total);
     }
-
-    elements.endTurnButton.textContent = "Partita conclusa";
   } else {
     elements.finalScorePanel.hidden = true;
   }
 
-  elements.endTurnButton.disabled = state.gameOver;
   elements.surrenderIfWarCheckbox.checked = Boolean(state.surrenderIfWar);
   renderBuildControls(state);
 
@@ -655,7 +624,6 @@ function renderGame(state) {
 
 elements.endTurnButton.addEventListener("click", (event) => {
   event.preventDefault();
-  console.log("[DEBUG] end turn button clicked", { turn: gameState.turn, phase: gameState.currentPhase });
 
   try {
     nextTurn(gameState);
@@ -680,11 +648,7 @@ elements.wonderCitySelect.addEventListener("change", () => {
 
 elements.startCityProjectButton.addEventListener("click", () => {
   const result = createCityProject(gameState);
-  if (!result.ok) {
-    elements.buildStatusMessage.textContent = result.reason;
-  } else {
-    elements.buildStatusMessage.textContent = "City project started.";
-  }
+  elements.buildStatusMessage.textContent = result.ok ? "City project started." : result.reason;
   renderGame(gameState);
 });
 
@@ -692,13 +656,7 @@ elements.startWonderProjectButton.addEventListener("click", () => {
   const wonderId = elements.wonderSelect.value;
   const cityId = elements.wonderCitySelect.value;
   const result = createWonderProject(gameState, wonderId, cityId);
-
-  if (!result.ok) {
-    elements.buildStatusMessage.textContent = result.reason;
-  } else {
-    elements.buildStatusMessage.textContent = "Wonder project started.";
-  }
-
+  elements.buildStatusMessage.textContent = result.ok ? "Wonder project started." : result.reason;
   renderGame(gameState);
 });
 
@@ -711,6 +669,13 @@ elements.surrenderIfWarCheckbox.addEventListener("change", () => {
   gameState.surrenderIfWar = elements.surrenderIfWarCheckbox.checked;
   renderGame(gameState);
 });
+
+if (elements.toggleLogButton) {
+  elements.toggleLogButton.addEventListener("click", () => {
+    showFullLog = !showFullLog;
+    renderEventLog(gameState);
+  });
+}
 
 renderGame(gameState);
 window.renderGame = renderGame;

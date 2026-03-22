@@ -7,287 +7,229 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">Strategy HUD</p>
-        <h1>Civilization Browser Game</h1>
-        <p class="subtitle">Dashboard principale orientata alle decisioni del turno.</p>
-      </div>
-      <div class="header-status-chip" id="header-phase-chip">Pronto</div>
-    </header>
-
-    <main class="game-layout">
-      <section class="hero-panel" aria-labelledby="hero-panel-title">
-        <div class="hero-main">
-          <div>
-            <p class="section-kicker">Panoramica turno</p>
-            <h2 id="hero-panel-title">Stato della civiltà</h2>
-            <p class="hero-summary-line">
-              Turno <span id="turn-value">1</span> / <span id="max-turns-value">50</span>
-              <span class="summary-separator">•</span>
-              Cultura <span id="culture-value">-</span>
-            </p>
-          </div>
-          <div class="hero-status-cluster">
-            <div class="status-chip" id="phase-chip">
-              <span class="chip-label">Fase</span>
-              <span id="phase-value">-</span>
-            </div>
-            <div class="status-chip" id="war-peace-chip">
-              <span class="chip-label">Stato</span>
-              <span id="war-peace-value">Pace</span>
-            </div>
-            <div class="status-chip" id="game-over-chip">
-              <span class="chip-label">Partita</span>
-              <span id="game-over-value">No</span>
-            </div>
-          </div>
+    <main class="app-shell">
+      <section class="top-summary-bar" aria-label="Stato turno e risorse principali">
+        <div class="summary-item">
+          <span class="summary-label">Turno</span>
+          <strong id="turn-value">1</strong>
+          <span class="summary-meta">/ <span id="max-turns-value">50</span></span>
         </div>
-
-        <div class="hero-metrics" aria-label="Risorse principali">
-          <article class="metric-card metric-card--primary">
-            <span class="metric-label">Cibo</span>
-            <strong class="metric-value" id="food-value">0</strong>
-            <span class="metric-meta">Produzione <span id="food-production-preview">0</span> · Upkeep <span id="food-upkeep-preview">0</span></span>
-          </article>
-          <article class="metric-card metric-card--primary">
-            <span class="metric-label">Oro</span>
-            <strong class="metric-value" id="gold-value">0</strong>
-            <span class="metric-meta">Income <span id="gold-production-preview">0</span> · Army upkeep <span id="gold-upkeep-preview">0</span></span>
-          </article>
-          <article class="metric-card">
-            <span class="metric-label">Popolazione</span>
-            <strong class="metric-value" id="population-total-resource-value">0</strong>
-            <span class="metric-meta"><span id="city-count-resource-value">0</span> città</span>
-          </article>
-          <article class="metric-card">
-            <span class="metric-label">Progetto attivo</span>
-            <strong class="metric-value metric-value--small" id="project-value">Nessuno</strong>
-            <span class="metric-meta">Advance iniziale: <span id="starting-advance-value">-</span></span>
-          </article>
+        <div class="summary-item">
+          <span class="summary-label">Cultura</span>
+          <strong id="culture-value">-</strong>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Cibo</span>
+          <strong id="food-value">0</strong>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Oro</span>
+          <strong id="gold-value">0</strong>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Popolazione</span>
+          <strong id="population-total-resource-value">0</strong>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">War / Peace</span>
+          <strong id="war-peace-value">Pace</strong>
+        </div>
+        <div class="summary-item summary-item--wide">
+          <span class="summary-label">Fase</span>
+          <div class="summary-phase-wrap">
+            <strong id="phase-value">-</strong>
+            <span class="badge badge--muted" id="header-phase-chip">Pronto</span>
+          </div>
         </div>
       </section>
 
       <section class="main-dashboard">
         <div class="primary-column">
-          <section class="panel panel--highlight" aria-labelledby="turn-action-title">
-            <div class="panel-header panel-header--split">
-              <div>
-                <p class="section-kicker">Azione principale</p>
-                <h2 id="turn-action-title">Controllo del turno</h2>
-              </div>
-              <div class="badge-row">
-                <span class="badge" id="readiness-badge">Pronto</span>
-                <span class="badge badge--muted" id="build-skipped-badge">Build ok</span>
-              </div>
+          <section class="panel panel--focus" aria-labelledby="turn-action-title">
+            <div class="panel-header">
+              <p class="section-kicker">Step corrente</p>
+              <h1 id="turn-action-title">Turn Workflow</h1>
             </div>
 
-            <div class="turn-focus-grid">
-              <div class="turn-cta-block">
-                <p id="turn-help-text" class="support-text">Avvia il ciclo economico del turno.</p>
-                <p id="turn-reason-text" class="turn-reason-text">Nessun blocco attivo.</p>
-                <div class="control-stack">
+            <div class="turn-workflow">
+              <ol class="workflow-steps" aria-label="Flusso del turno">
+                <li id="workflow-step-distribution" class="workflow-step">1. Distribuzione popolazione</li>
+                <li id="workflow-step-build" class="workflow-step">2. Progetto opzionale</li>
+                <li id="workflow-step-end" class="workflow-step">3. Concludi turno</li>
+              </ol>
+
+              <div class="turn-cta-card">
+                <div>
+                  <p class="current-step-label" id="readiness-badge">Pronto</p>
+                  <strong class="current-step-title" id="recommended-action-title">Controlla lo stato del turno</strong>
+                  <p id="turn-help-text" class="turn-help-text">Usa questa area per capire cosa devi fare adesso.</p>
+                  <p id="turn-reason-text" class="turn-reason-text">Nessun blocco attivo.</p>
+                </div>
+
+                <div class="turn-cta-actions">
                   <label class="inline-check" for="surrender-if-war-checkbox">
                     <input id="surrender-if-war-checkbox" type="checkbox" /> Surrender if war occurs
                   </label>
                   <button id="end-turn-button" type="button">Concludi turno</button>
+                  <p id="build-skipped-badge" class="inline-note">Build ok</p>
                 </div>
               </div>
-
-              <aside class="recommended-action-card">
-                <span class="card-label">Azione consigliata</span>
-                <strong id="recommended-action-title">Controlla la situazione del turno</strong>
-                <p id="recommended-action-text" class="support-text">La schermata evidenzia qui la priorità corrente.</p>
-              </aside>
             </div>
           </section>
 
           <section class="panel" aria-labelledby="distribution-title">
             <div class="panel-header panel-header--split">
               <div>
-                <p class="section-kicker">Gestione popolazione</p>
+                <p class="section-kicker">Step 1</p>
                 <h2 id="distribution-title">Population Distribution</h2>
               </div>
-              <div class="inline-summary">
-                <span class="inline-summary-label">Totale</span>
-                <strong id="population-total-value">0</strong>
+              <div class="mini-summary" aria-label="Sintesi allocazione">
+                <span class="mini-summary-item">Tot <strong id="population-total-value">0</strong></span>
+                <span class="mini-summary-item">Cities <strong id="city-count-resource-value">0</strong></span>
+                <span class="mini-summary-item">Scholars max <strong id="scholars-cap-value">0</strong></span>
               </div>
             </div>
+
             <p id="distribution-status" class="support-text">Attiva solo durante la fase Distribution.</p>
             <div id="population-distribution-controls" class="distribution-controls"></div>
-            <div class="subpanel">
-              <h3>Allocazione attuale</h3>
-              <ul id="population-assignments-list" class="compact-list stat-list"></ul>
-            </div>
+            <p id="population-assignment-summary" class="support-text compact-support">Army 0 · Agriculture 0 · Trade 0 · Labor 0 · Scholars 0</p>
           </section>
 
-          <section class="panel" aria-labelledby="build-projects-title">
+          <section class="panel panel--compact" aria-labelledby="build-projects-title">
             <div class="panel-header panel-header--split">
               <div>
-                <p class="section-kicker">Produzione</p>
+                <p class="section-kicker">Step 2</p>
                 <h2 id="build-projects-title">Build Projects</h2>
               </div>
               <span class="badge badge--muted" id="project-phase-badge">Build</span>
             </div>
 
             <div class="build-controls">
-              <div class="form-grid">
-                <label for="project-type-select">Tipo progetto</label>
+              <div class="build-row">
+                <label for="project-type-select" class="sr-only">Tipo progetto</label>
                 <select id="project-type-select">
                   <option value="city">New City</option>
                   <option value="wonder">Wonder</option>
                 </select>
 
-                <button id="start-city-project-button" type="button">Start City Project</button>
+                <button id="start-city-project-button" type="button">Start</button>
               </div>
 
               <div id="wonder-controls" class="wonder-controls">
-                <label for="wonder-select">Wonder disponibile</label>
-                <select id="wonder-select"></select>
-
-                <label for="wonder-city-select">Città ospitante</label>
-                <select id="wonder-city-select"></select>
-
-                <button id="start-wonder-project-button" type="button">Start Wonder Project</button>
+                <select id="wonder-select" aria-label="Wonder disponibile"></select>
+                <select id="wonder-city-select" aria-label="Città ospitante"></select>
+                <button id="start-wonder-project-button" type="button">Start Wonder</button>
               </div>
 
-              <p id="build-status-message" class="support-text"></p>
+              <p id="build-status-message" class="support-text compact-support"></p>
 
-              <div id="active-project-box" class="active-project-box">
-                <div class="subpanel-header">
-                  <strong>Progetto attivo</strong>
-                  <span class="badge badge--subtle">Produzione</span>
+              <div id="active-project-box" class="active-project-box active-project-box--compact">
+                <span class="card-label">Progetto attivo</span>
+                <div class="active-project-inline">
+                  <strong id="build-current-project">No active project</strong>
+                  <span id="build-labor-progress">-</span>
+                  <span class="active-project-separator">/</span>
+                  <span id="build-labor-required">-</span>
+                  <span id="build-project-city" class="muted-line">-</span>
                 </div>
-                <dl class="stats-grid">
-                  <div>
-                    <dt>Nome</dt>
-                    <dd id="build-current-project">No active project</dd>
-                  </div>
-                  <div>
-                    <dt>Labor progress</dt>
-                    <dd id="build-labor-progress">-</dd>
-                  </div>
-                  <div>
-                    <dt>Labor required</dt>
-                    <dd id="build-labor-required">-</dd>
-                  </div>
-                  <div>
-                    <dt>Città associata</dt>
-                    <dd id="build-project-city">-</dd>
-                  </div>
-                </dl>
               </div>
             </div>
           </section>
         </div>
 
         <aside class="secondary-column">
-          <section class="panel panel--secondary" aria-labelledby="summary-title">
+          <section class="panel panel--secondary" aria-labelledby="empire-summary-title">
             <div class="panel-header">
               <p class="section-kicker">Sintesi</p>
-              <h2 id="summary-title">Civilization Summary</h2>
+              <h2 id="empire-summary-title">Impero</h2>
             </div>
             <dl class="stats-grid stats-grid--dense">
-              <div><dt>Turno</dt><dd id="summary-turn">-</dd></div>
-              <div><dt>Cultura</dt><dd id="summary-culture">-</dd></div>
-              <div><dt>Popolazione</dt><dd id="summary-population">-</dd></div>
               <div><dt>Città</dt><dd id="summary-cities">-</dd></div>
               <div><dt>Wonders</dt><dd id="summary-wonders">-</dd></div>
               <div><dt>Advances</dt><dd id="summary-advances">-</dd></div>
+              <div><dt>Leaders</dt><dd id="summary-leaders">-</dd></div>
             </dl>
           </section>
 
-          <section class="panel panel--secondary" aria-labelledby="economy-title">
+          <section class="panel panel--secondary" aria-labelledby="turn-forecast-title">
             <div class="panel-header">
-              <p class="section-kicker">Economia</p>
-              <h2 id="economy-title">Dettaglio risorse</h2>
+              <p class="section-kicker">Previsioni</p>
+              <h2 id="turn-forecast-title">Turno</h2>
             </div>
             <dl class="stats-grid stats-grid--dense">
-              <div><dt>Trade da popolazione</dt><dd id="trade-population-preview">0</dd></div>
-              <div><dt>Trade da città</dt><dd id="trade-cities-preview">0</dd></div>
-              <div><dt>Bonus Coinage</dt><dd id="trade-coinage-preview">0</dd></div>
-              <div><dt>Bonus Navigation</dt><dd id="trade-navigation-preview">0</dd></div>
-              <div><dt>Bonus Rulers</dt><dd id="trade-rulers-preview">0</dd></div>
-              <div><dt>Trade totale previsto</dt><dd id="trade-total-preview">0</dd></div>
-            </dl>
-          </section>
-
-          <section class="panel panel--secondary" aria-labelledby="research-preview-title">
-            <div class="panel-header">
-              <p class="section-kicker">Ricerca</p>
-              <h2 id="research-preview-title">Preview ricerca</h2>
-            </div>
-            <dl class="stats-grid stats-grid--dense">
-              <div><dt>Scholars</dt><dd id="research-scholars-preview">0</dd></div>
-              <div><dt>Thinkers</dt><dd id="research-thinkers-preview">0</dd></div>
-              <div><dt>Bonus Astronomy</dt><dd id="research-astronomy-preview">0</dd></div>
-              <div><dt>Bonus Literacy</dt><dd id="research-literacy-preview">0</dd></div>
-              <div><dt>Bonus Mathematics</dt><dd id="research-mathematics-preview">0</dd></div>
-              <div><dt>Great Library</dt><dd id="research-great-library-preview">0</dd></div>
-              <div><dt>Bonus advances</dt><dd id="research-advances-total-preview">0</dd></div>
-              <div><dt>Bonus wonders</dt><dd id="research-wonders-total-preview">0</dd></div>
+              <div><dt>Food production</dt><dd id="food-production-preview">0</dd></div>
+              <div><dt>Food upkeep</dt><dd id="food-upkeep-preview">0</dd></div>
+              <div><dt>Gold income</dt><dd id="gold-production-preview">0</dd></div>
+              <div><dt>Army upkeep</dt><dd id="gold-upkeep-preview">0</dd></div>
               <div><dt>Research rolls</dt><dd id="research-total-preview">0</dd></div>
+              <div><dt>Net resources</dt><dd id="net-turn-preview">0 / 0</dd></div>
             </dl>
           </section>
 
-          <section class="panel panel--secondary" aria-labelledby="status-panels-title">
+          <section class="panel panel--secondary" aria-labelledby="status-title">
             <div class="panel-header">
-              <p class="section-kicker">Status compatti</p>
-              <h2 id="status-panels-title">War & Disaster</h2>
+              <p class="section-kicker">Status</p>
+              <h2 id="status-title">Stati</h2>
             </div>
-            <div class="status-stack">
-              <article class="status-panel" aria-labelledby="war-panel-title">
-                <div class="subpanel-header">
-                  <h3 id="war-panel-title">War</h3>
-                  <span class="badge badge--subtle" id="war-status-badge">Pace</span>
-                </div>
-                <dl class="stats-grid stats-grid--dense">
-                  <div><dt>Tipo</dt><dd id="war-type-value">-</dd></div>
-                  <div><dt>Enemy armies</dt><dd id="war-enemy-value">-</dd></div>
-                  <div><dt>Risultato</dt><dd id="war-result-value">-</dd></div>
-                  <div><dt>Ultima guerra</dt><dd id="last-war-value">Nessuna</dd></div>
-                </dl>
-              </article>
-
-              <article class="status-panel" aria-labelledby="disaster-panel-title">
-                <div class="subpanel-header">
-                  <h3 id="disaster-panel-title">Disaster</h3>
-                  <span class="badge badge--subtle" id="disaster-status-badge">Nessuno</span>
-                </div>
-                <dl class="stats-grid stats-grid--dense">
-                  <div><dt>Ultimo disaster</dt><dd id="disaster-last-value">Nessuno</dd></div>
-                  <div><dt>Registro</dt><dd id="last-disaster-value">Nessuno</dd></div>
-                </dl>
-              </article>
-            </div>
-          </section>
-
-          <section class="panel panel--secondary" aria-labelledby="advances-leaders-title">
-            <div class="panel-header">
-              <p class="section-kicker">Progressione</p>
-              <h2 id="advances-leaders-title">Advances e Leaders</h2>
-            </div>
-            <h3>Advances</h3>
-            <ul id="advances-list" class="compact-list advance-list"></ul>
-            <h3>Leaders</h3>
-            <ul id="leaders-list" class="compact-list stat-list"></ul>
-          </section>
-
-          <section class="panel panel--secondary" aria-labelledby="cities-wonders-title">
-            <div class="panel-header">
-              <p class="section-kicker">Territorio</p>
-              <h2 id="cities-wonders-title">Città e Wonders</h2>
-            </div>
-            <div class="inline-summary inline-summary--space">
-              <span class="inline-summary-label">Numero città</span>
-              <strong id="city-count-value">0</strong>
-            </div>
-            <h3>Città</h3>
-            <ul id="cities-list" class="compact-list stat-list"></ul>
-            <h3>Wonders</h3>
-            <ul id="wonders-list" class="compact-list stat-list"></ul>
+            <dl class="stats-grid stats-grid--dense">
+              <div><dt>War state</dt><dd><span class="badge badge--subtle" id="war-status-badge">Pace</span></dd></div>
+              <div><dt>Disaster state</dt><dd><span class="badge badge--subtle" id="disaster-status-badge">Nessuno</span></dd></div>
+              <div><dt>Last war</dt><dd id="last-war-value">Nessuna</dd></div>
+              <div><dt>Last disaster</dt><dd id="last-disaster-value">Nessuno</dd></div>
+            </dl>
           </section>
         </aside>
+      </section>
+
+      <section class="secondary-sections" aria-label="Dettagli secondari">
+        <details class="panel details-panel">
+          <summary>
+            <span>Advances & Leaders</span>
+            <span class="summary-hint">Dettagli completi</span>
+          </summary>
+          <div class="details-grid">
+            <section>
+              <h3>Advances</h3>
+              <ul id="advances-list" class="compact-list advance-list"></ul>
+            </section>
+            <section>
+              <h3>Leaders</h3>
+              <ul id="leaders-list" class="compact-list stat-list"></ul>
+            </section>
+          </div>
+        </details>
+
+        <details class="panel details-panel">
+          <summary>
+            <span>Cities & Wonders</span>
+            <span class="summary-hint">Dettagli completi</span>
+          </summary>
+          <div class="details-grid">
+            <section>
+              <div class="inline-summary inline-summary--space">
+                <span class="inline-summary-label">Numero città</span>
+                <strong id="city-count-value">0</strong>
+              </div>
+              <h3>Città</h3>
+              <ul id="cities-list" class="compact-list stat-list"></ul>
+            </section>
+            <section>
+              <h3>Wonders</h3>
+              <ul id="wonders-list" class="compact-list stat-list"></ul>
+            </section>
+          </div>
+        </details>
+
+        <details class="panel details-panel" open>
+          <summary>
+            <span>Event Log</span>
+            <span class="summary-hint">Ultimi 5 eventi</span>
+          </summary>
+          <div class="log-controls">
+            <button id="toggle-log-button" type="button" class="ghost-button">Vedi tutto</button>
+          </div>
+          <ul id="event-log-list" class="event-log"></ul>
+        </details>
       </section>
 
       <section class="panel final-score-panel" id="final-score-panel" aria-labelledby="final-score-title" hidden>
@@ -303,17 +245,6 @@
         </div>
         <p id="endless-mode-message" hidden>Endless mode attiva: la partita continua senza punteggio finale.</p>
         <button id="continue-after-end-button" type="button">Continua a giocare</button>
-      </section>
-
-      <section class="panel panel--secondary log-panel" aria-labelledby="event-log-title">
-        <div class="panel-header panel-header--split">
-          <div>
-            <p class="section-kicker">Storico</p>
-            <h2 id="event-log-title">Log eventi</h2>
-          </div>
-          <span class="badge badge--muted">Scrollabile</span>
-        </div>
-        <ul id="event-log-list" class="event-log"></ul>
       </section>
     </main>
 
