@@ -159,10 +159,14 @@
 
       <section class="card full-width final-score-panel" id="final-score-panel" aria-labelledby="final-score-title" hidden>
         <h2 id="final-score-title">Final Score</h2>
-        <p><strong>Advance points:</strong> <span id="final-advance-points">0</span></p>
-        <p><strong>City points:</strong> <span id="final-city-points">0</span></p>
-        <p><strong>Wonder points:</strong> <span id="final-wonder-points">0</span></p>
-        <p><strong>Total score:</strong> <span id="final-total-score">0</span></p>
+        <div id="final-score-details">
+          <p><strong>Advance points:</strong> <span id="final-advance-points">0</span></p>
+          <p><strong>City points:</strong> <span id="final-city-points">0</span></p>
+          <p><strong>Wonder points:</strong> <span id="final-wonder-points">0</span></p>
+          <p><strong>Total score:</strong> <span id="final-total-score">0</span></p>
+        </div>
+        <p id="endless-mode-message" hidden>Endless mode attiva: la partita continua senza punteggio finale.</p>
+        <button id="continue-after-end-button" type="button">Continua a giocare</button>
       </section>
 
       <section class="card full-width" aria-labelledby="event-log-title">

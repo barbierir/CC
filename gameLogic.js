@@ -649,6 +649,8 @@ function createInitialGameState() {
     lastWarSummary: null,
     gameLog,
     gameOver: false,
+    endlessMode: false,
+    scoreEnabled: true,
     finalScore: null,
     lastUnlockedAdvance: null,
     lastCompletedProject: null,
@@ -1309,6 +1311,15 @@ function applyPopulationChange(state, role, delta) {
   return { ok: false, reason: "Delta must be +1 or -1" };
 }
 
+function continueAfterEnd(state) {
+  state.endlessMode = true;
+  state.gameOver = false;
+  state.scoreEnabled = false;
+  state.finalScore = null;
+  state.gameLog.push("Endless mode activated: final score disabled, game continues beyond turn limit");
+  return state;
+}
+
 function nextTurn(state) {
   console.log("[DEBUG] nextTurn started", { turn: state?.turn, phase: state?.currentPhase, gameOver: state?.gameOver });
   if (state.gameOver) {
@@ -1366,9 +1377,9 @@ function nextTurn(state) {
 
     enforceStateInvariants(state);
 
-    if (state.turn > state.maxTurns) {
+    if (state.turn > state.maxTurns && !state.endlessMode) {
       state.gameOver = true;
-      state.finalScore = calculateFinalScore(state);
+      state.finalScore = state.scoreEnabled === false ? null : calculateFinalScore(state);
       state.gameLog.push("Game finished after 50 turns");
     }
   }
@@ -1443,6 +1454,7 @@ window.GameLogic = {
   getRandomAvailableAdvance,
   resolveResearchPhase,
   calculateFinalScore,
+  continueAfterEnd,
   canIncreasePopulationRole,
   canDecreasePopulationRole,
   applyPopulationChange,
