@@ -13,6 +13,7 @@ const {
   canIncreasePopulationRole,
   canDecreasePopulationRole,
   calculateFinalScore,
+  continueAfterEnd,
   nextTurn,
 } = window.GameLogic;
 
@@ -110,6 +111,9 @@ const elements = {
   buildProjectCity: document.getElementById("build-project-city"),
   surrenderIfWarCheckbox: document.getElementById("surrender-if-war-checkbox"),
   finalScorePanel: document.getElementById("final-score-panel"),
+  finalScoreDetails: document.getElementById("final-score-details"),
+  endlessModeMessage: document.getElementById("endless-mode-message"),
+  continueAfterEndButton: document.getElementById("continue-after-end-button"),
   finalAdvancePoints: document.getElementById("final-advance-points"),
   finalCityPoints: document.getElementById("final-city-points"),
   finalWonderPoints: document.getElementById("final-wonder-points"),
@@ -505,12 +509,19 @@ function renderGame(state) {
 
 
   if (state.gameOver) {
-    const score = state.finalScore || calculateFinalScore(state);
+    const score = state.scoreEnabled === false ? null : (state.finalScore || calculateFinalScore(state));
     elements.finalScorePanel.hidden = false;
-    elements.finalAdvancePoints.textContent = String(score.advancePoints);
-    elements.finalCityPoints.textContent = String(score.cityPoints);
-    elements.finalWonderPoints.textContent = String(score.wonderPoints);
-    elements.finalTotalScore.textContent = String(score.total);
+    elements.finalScoreDetails.hidden = !score;
+    elements.endlessModeMessage.hidden = Boolean(score);
+    elements.continueAfterEndButton.hidden = state.endlessMode;
+
+    if (score) {
+      elements.finalAdvancePoints.textContent = String(score.advancePoints);
+      elements.finalCityPoints.textContent = String(score.cityPoints);
+      elements.finalWonderPoints.textContent = String(score.wonderPoints);
+      elements.finalTotalScore.textContent = String(score.total);
+    }
+
     elements.endTurnButton.textContent = "Partita conclusa";
   } else {
     elements.finalScorePanel.hidden = true;
@@ -574,6 +585,11 @@ elements.startWonderProjectButton.addEventListener("click", () => {
     elements.buildStatusMessage.textContent = "Wonder project started.";
   }
 
+  renderGame(gameState);
+});
+
+elements.continueAfterEndButton.addEventListener("click", () => {
+  continueAfterEnd(gameState);
   renderGame(gameState);
 });
 
